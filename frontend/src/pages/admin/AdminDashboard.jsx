@@ -517,14 +517,14 @@ const AdminDashboard = () => {
             {/* Filters */}
             <div className="flex flex-wrap gap-4">
               <Select 
-                value={courseFilter.status} 
-                onValueChange={(v) => setCourseFilter({ ...courseFilter, status: v })}
+                value={courseFilter.status || "all"} 
+                onValueChange={(v) => setCourseFilter({ ...courseFilter, status: v === "all" ? "" : v })}
               >
                 <SelectTrigger className="w-40 bg-[#18181B] border-zinc-700 text-white">
                   <SelectValue placeholder="Statut" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Tous</SelectItem>
+                  <SelectItem value="all">Tous</SelectItem>
                   <SelectItem value="pending">En attente</SelectItem>
                   <SelectItem value="assigned">Assignée</SelectItem>
                   <SelectItem value="in_progress">En cours</SelectItem>
