@@ -14,8 +14,8 @@ import { Calendar as CalendarComponent } from '../../components/ui/calendar';
 import { toast } from 'sonner';
 import { chauffeurApi } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import 'leaflet/dist/leaflet.css';
 
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
