@@ -826,7 +826,7 @@ const ChauffeurDashboard = () => {
               )}
             </MapContainer>
 
-            {/* Route Info Bar */}
+            {/* Route Info Bar - TEMPS RÉEL */}
             {currentCourse && routeInfo && (
               <div className="absolute top-2 left-2 right-2 bg-white rounded-xl shadow-lg p-4 z-10">
                 <div className="flex items-center justify-between">
@@ -835,13 +835,16 @@ const ChauffeurDashboard = () => {
                       <Route className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <p className="text-black font-bold text-xl">{routeInfo.duration}</p>
+                      {/* Temps restant en temps réel */}
+                      <p className="text-black font-bold text-xl">
+                        {remainingTime !== null ? formatTime(remainingTime) : routeInfo.duration}
+                      </p>
                       <p className="text-gray-500 text-sm">{routeInfo.distance}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-gray-400 text-xs uppercase">Arrivée</p>
-                    <p className="text-black font-bold text-2xl">{routeInfo.eta}</p>
+                    <p className="text-gray-400 text-xs uppercase">Temps écoulé</p>
+                    <p className="text-black font-bold text-2xl font-mono">{formatTime(elapsedTime)}</p>
                   </div>
                 </div>
               </div>
@@ -857,14 +860,41 @@ const ChauffeurDashboard = () => {
                     </p>
                     <p className="text-white font-bold">{currentCourse.commande_no}</p>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                    currentCourse.status === 'in_progress' 
-                      ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
-                      : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                  }`}>
-                    {currentCourse.status === 'in_progress' ? 'En course' : 'Client en attente'}
-                  </span>
+                  {/* Chrono temps réel */}
+                  <div className="flex items-center gap-3">
+                    <div className="bg-[#FFD700]/20 px-4 py-2 rounded-lg">
+                      <p className="text-[#FFD700] font-mono font-bold text-lg">{formatTime(elapsedTime)}</p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      currentCourse.status === 'in_progress' 
+                        ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                        : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                    }`}>
+                      {currentCourse.status === 'in_progress' ? 'En course' : 'Vers client'}
+                    </span>
+                  </div>
                 </div>
+                
+                {/* Route info compact */}
+                {routeInfo && (
+                  <div className="flex items-center justify-between mb-4 bg-[#09090B] rounded-lg p-3">
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <p className="text-zinc-500 text-xs">RESTANT</p>
+                        <p className="text-white font-bold">{remainingTime !== null ? formatTime(remainingTime) : routeInfo.duration}</p>
+                      </div>
+                      <div className="w-px h-8 bg-zinc-700" />
+                      <div>
+                        <p className="text-zinc-500 text-xs">DISTANCE</p>
+                        <p className="text-white font-bold">{routeInfo.distance}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-zinc-500 text-xs">ETA</p>
+                      <p className="text-[#FFD700] font-bold text-xl">{routeInfo.eta}</p>
+                    </div>
+                  </div>
+                )}
                 
                 {/* Route visualization */}
                 <div className="bg-[#09090B] rounded-lg p-4 mb-4">
