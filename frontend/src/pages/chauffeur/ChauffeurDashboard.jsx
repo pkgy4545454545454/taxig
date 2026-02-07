@@ -56,48 +56,38 @@ const destinationIcon = new L.DivIcon({
 // Map component - SMOOTH REAL-TIME TRACKING like Google Maps
 const MapController = ({ chauffeurPos, clientPos, destinationPos, courseStatus, isFollowing }) => {
   const map = useMap();
-  const lastCenterRef = useRef(null);
   const isInitializedRef = useRef(false);
   
   useEffect(() => {
     if (!map || !chauffeurPos) return;
     
-    // If we have a course, fit bounds initially then follow chauffeur smoothly
+    // Quand on a une course assignée - montrer chauffeur et client
     if (courseStatus === 'assigned' && clientPos) {
-      // Initial fit to show both points
       if (!isInitializedRef.current) {
+        // Premier affichage - fit bounds pour voir les deux points
         const bounds = L.latLngBounds([
           L.latLng(chauffeurPos[0], chauffeurPos[1]),
           L.latLng(clientPos[0], clientPos[1])
         ]);
-        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15, animate: true });
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17, animate: true });
         isInitializedRef.current = true;
       } else if (isFollowing) {
-        // Smooth follow chauffeur - pan smoothly like Google Maps navigation
-        map.panTo(L.latLng(chauffeurPos[0], chauffeurPos[1]), { animate: true, duration: 0.5 });
+        // Suivi fluide du chauffeur
+        map.setView(L.latLng(chauffeurPos[0], chauffeurPos[1]), 17, { animate: true, duration: 0.3 });
       }
-    } else if (courseStatus === 'in_progress' && destinationPos) {
-      // In progress - follow chauffeur towards destination
+    } 
+    // En course - suivre le chauffeur vers la destination
+    else if (courseStatus === 'in_progress' && destinationPos) {
       if (isFollowing) {
-        map.panTo(L.latLng(chauffeurPos[0], chauffeurPos[1]), { animate: true, duration: 0.5 });
+        map.setView(L.latLng(chauffeurPos[0], chauffeurPos[1]), 17, { animate: true, duration: 0.3 });
       }
-    } else if (!courseStatus) {
-      // No course - center on chauffeur
-      if (!isInitializedRef.current || isFollowing) {
-        map.setView(L.latLng(chauffeurPos[0], chauffeurPos[1]), 16, { animate: true });
-        isInitializedRef.current = true;
-      }
-    }
-    
-    lastCenterRef.current = chauffeurPos;
-  }, [map, chauffeurPos, clientPos, destinationPos, courseStatus, isFollowing]);
-  
-  // Reset initialization when course changes
-  useEffect(() => {
-    if (!courseStatus) {
+    } 
+    // Pas de course - centrer sur le chauffeur avec zoom max
+    else if (!courseStatus) {
+      map.setView(L.latLng(chauffeurPos[0], chauffeurPos[1]), 18, { animate: true });
       isInitializedRef.current = false;
     }
-  }, [courseStatus]);
+  }, [map, chauffeurPos, clientPos, destinationPos, courseStatus, isFollowing]);
   
   return null;
 };
