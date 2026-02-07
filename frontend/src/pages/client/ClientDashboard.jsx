@@ -535,7 +535,7 @@ const ClientDashboard = () => {
           <>
             <MapContainer 
               center={mapCenter} 
-              zoom={16} 
+              zoom={17} 
               className="w-full h-full z-0"
               zoomControl={false}
               scrollWheelZoom={false}
