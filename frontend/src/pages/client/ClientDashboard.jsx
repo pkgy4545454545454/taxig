@@ -53,14 +53,14 @@ const destIcon = new L.DivIcon({
   iconAnchor: [10, 10],
 });
 
-// Map center updater component
-const MapUpdater = ({ center }) => {
+// Map center updater component - ZOOM MAX pour voir les détails de la route
+const MapUpdater = ({ center, zoom = 18 }) => {
   const map = useMap();
   useEffect(() => {
     if (center) {
-      map.setView(center, 14);
+      map.setView(center, zoom, { animate: true, duration: 0.5 });
     }
-  }, [center, map]);
+  }, [center, zoom, map]);
   return null;
 };
 
