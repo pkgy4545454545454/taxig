@@ -1023,7 +1023,19 @@ const ChauffeurDashboard = () => {
         {/* Revenus View */}
         {view === 'revenus' && (
           <div className="p-6 overflow-y-auto h-full">
-            <h2 className="text-2xl font-bold text-white mb-6">Mes revenus</h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">Mes revenus</h2>
+              {revenus && (
+                <Button 
+                  className="bg-[#FFD700] hover:bg-[#FFD700]/90 text-black font-bold flex items-center gap-2"
+                  onClick={exportRevenusPDF}
+                  data-testid="export-pdf-btn"
+                >
+                  <Download className="w-4 h-4" />
+                  Télécharger PDF
+                </Button>
+              )}
+            </div>
             
             {!revenus ? (
               <div className="text-center py-12">
@@ -1032,6 +1044,25 @@ const ChauffeurDashboard = () => {
               </div>
             ) : (
               <div className="space-y-6">
+                {/* Export Banner */}
+                <div className="bg-gradient-to-r from-[#FFD700]/20 to-transparent border border-[#FFD700]/30 rounded-xl p-4 flex items-center gap-4">
+                  <div className="w-12 h-12 bg-[#FFD700]/20 rounded-full flex items-center justify-center">
+                    <FileText className="w-6 h-6 text-[#FFD700]" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-white font-bold">Export Comptabilité</p>
+                    <p className="text-zinc-400 text-sm">Téléchargez vos revenus en PDF pour votre comptable</p>
+                  </div>
+                  <Button 
+                    variant="outline"
+                    className="border-[#FFD700] text-[#FFD700] hover:bg-[#FFD700]/10"
+                    onClick={exportRevenusPDF}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    PDF
+                  </Button>
+                </div>
+                
                 <div className="card-taxi p-6 border-[#FFD700]/30">
                   <p className="text-zinc-400 text-sm">Revenus brut (30 jours)</p>
                   <p className="text-[#FFD700] text-4xl font-black">{revenus.revenus_brut_30j?.toFixed(2)}€</p>
@@ -1043,15 +1074,33 @@ const ChauffeurDashboard = () => {
                     <p className="text-white text-2xl font-bold">{revenus.revenus_net_30j?.toFixed(2)}€</p>
                   </div>
                   <div className="card-taxi p-4">
-                    <p className="text-zinc-400 text-sm">Commission</p>
-                    <p className="text-red-400 text-2xl font-bold">{revenus.commission_due?.toFixed(2)}€</p>
+                    <p className="text-zinc-400 text-sm">Commission TaxiG</p>
+                    <p className="text-red-400 text-2xl font-bold">-{revenus.commission_due?.toFixed(2)}€</p>
                   </div>
                 </div>
                 
                 <div className="card-taxi p-4">
-                  <p className="text-zinc-400 text-sm">Courses</p>
+                  <p className="text-zinc-400 text-sm">Nombre de courses</p>
                   <p className="text-white text-2xl font-bold">{revenus.nombre_courses_30j}</p>
                 </div>
+                
+                {/* Courses detail list */}
+                {revenusDetails.length > 0 && (
+                  <div className="card-taxi p-4">
+                    <p className="text-zinc-400 text-sm mb-4">Dernières courses complétées</p>
+                    <div className="space-y-3 max-h-60 overflow-y-auto">
+                      {revenusDetails.slice(0, 10).map((course) => (
+                        <div key={course.id} className="flex justify-between items-center py-2 border-b border-zinc-700/50 last:border-0">
+                          <div>
+                            <p className="text-white text-sm font-medium">{course.commande_no}</p>
+                            <p className="text-zinc-500 text-xs">{new Date(course.created_at).toLocaleDateString('fr-FR')}</p>
+                          </div>
+                          <p className="text-[#FFD700] font-bold">{course.prix?.toFixed(2)}€</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
