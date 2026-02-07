@@ -283,6 +283,55 @@ const ClientDashboard = () => {
     }
   };
 
+  // Setup Google Places Autocomplete for destination
+  useEffect(() => {
+    if (!googleLoaded || !destInputRef.current || bookingStep !== 2) return;
+    
+    const autocomplete = new window.google.maps.places.Autocomplete(destInputRef.current, {
+      types: ['address'],
+      componentRestrictions: { country: ['fr', 'ch', 'be'] } // France, Suisse, Belgique
+    });
+    
+    autocomplete.addListener('place_changed', () => {
+      const place = autocomplete.getPlace();
+      if (place.geometry) {
+        setDestination({
+          address: place.formatted_address || place.name,
+          lat: place.geometry.location.lat(),
+          lng: place.geometry.location.lng()
+        });
+      }
+    });
+    
+    destAutocompleteRef.current = autocomplete;
+  }, [googleLoaded, bookingStep]);
+
+  // Calculate route with Google Directions API
+  const calculateRoute = useCallback(async () => {
+    if (!googleLoaded || !pickup.lat || !destination.lat) return null;
+    
+    return new Promise((resolve) => {
+      const directionsService = new window.google.maps.DirectionsService();
+      
+      directionsService.route({
+        origin: { lat: pickup.lat, lng: pickup.lng },
+        destination: { lat: destination.lat, lng: destination.lng },
+        travelMode: window.google.maps.TravelMode.DRIVING
+      }, (result, status) => {
+        if (status === 'OK' && result.routes[0]) {
+          const route = result.routes[0].legs[0];
+          resolve({
+            distance_km: route.distance.value / 1000, // meters to km
+            duration_minutes: route.duration.value / 60, // seconds to minutes
+            polyline: result.routes[0].overview_polyline
+          });
+        } else {
+          resolve(null);
+        }
+      });
+    });
+  }, [googleLoaded, pickup, destination]);
+
   // Simulate destination input (in real app, use Google Places)
   const handleDestinationInput = (value) => {
     setDestination({ ...destination, address: value });
