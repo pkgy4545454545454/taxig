@@ -96,6 +96,31 @@ const ClientDashboard = () => {
   const [rouletteResult, setRouletteResult] = useState(null);
   const rouletteRef = useRef(null);
 
+  // Google Maps script loading
+  const [googleLoaded, setGoogleLoaded] = useState(false);
+  const pickupAutocompleteRef = useRef(null);
+  const destAutocompleteRef = useRef(null);
+  const pickupInputRef = useRef(null);
+  const destInputRef = useRef(null);
+
+  // Load Google Maps script
+  useEffect(() => {
+    if (window.google) {
+      setGoogleLoaded(true);
+      return;
+    }
+    
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`;
+    script.async = true;
+    script.onload = () => setGoogleLoaded(true);
+    document.head.appendChild(script);
+    
+    return () => {
+      // Cleanup if needed
+    };
+  }, []);
+
   // Get user geolocation
   useEffect(() => {
     if (navigator.geolocation) {
