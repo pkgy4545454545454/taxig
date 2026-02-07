@@ -301,6 +301,20 @@ const ClientCourse = () => {
         )}
 
         {course.status === 'completed' && (
+          <div className="text-center mb-6">
+            <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-10 h-10 text-green-400" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Vous êtes arrivé !</h2>
+            <p className="text-zinc-400">Merci d'avoir voyagé avec TaxiG</p>
+            <div className="mt-4 p-4 bg-[#09090B] rounded-lg">
+              <p className="text-zinc-400 text-sm">Prix final</p>
+              <p className="text-[#FFD700] text-3xl font-black">{course.prix_final?.toFixed(2)}€</p>
+            </div>
+          </div>
+        )}
+
+        {course.status === 'completed' && (
           <Button 
             className="btn-taxi w-full"
             onClick={() => navigate('/client')}
