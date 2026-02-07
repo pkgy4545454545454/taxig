@@ -242,7 +242,7 @@ const ChauffeurDashboard = () => {
         `${c.prix?.toFixed(2) || '0.00'} €`
       ]);
       
-      doc.autoTable({
+      autoTable(doc, {
         startY: detailY + 6,
         head: [['N° Commande', 'Date', 'Client', 'Montant']],
         body: coursesData,
