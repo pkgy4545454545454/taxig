@@ -1,15 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 import { 
   Menu, X, MapPin, Navigation, Search, CreditCard, Banknote, 
-  History, BarChart3, Gift, LogOut, Car, Clock, AlertCircle
+  History, BarChart3, Gift, LogOut, Car, Clock, AlertCircle, Loader2
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../../components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog';
 import { toast } from 'sonner';
@@ -17,6 +14,7 @@ import { clientApi, courseApi, publicApi, paymentApi } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import 'leaflet/dist/leaflet.css';
 
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 const LOGO_URL = "https://customer-assets.emergentagent.com/job_geolocab-platform/artifacts/6p3uaynm_1000103457-removebg-preview.png";
 
 // Fix Leaflet icon issue
@@ -42,17 +40,17 @@ const taxiIcon = new L.DivIcon({
 // User location icon
 const userIcon = new L.DivIcon({
   className: 'user-marker',
-  html: `<div style="width: 24px; height: 24px; background: #3B82F6; border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>`,
-  iconSize: [24, 24],
-  iconAnchor: [12, 12],
+  html: `<div style="width: 20px; height: 20px; background: #3B82F6; border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>`,
+  iconSize: [20, 20],
+  iconAnchor: [10, 10],
 });
 
 // Destination icon
 const destIcon = new L.DivIcon({
   className: 'dest-marker',
-  html: `<div style="width: 24px; height: 24px; background: #22C55E; border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>`,
-  iconSize: [24, 24],
-  iconAnchor: [12, 12],
+  html: `<div style="width: 20px; height: 20px; background: #22C55E; border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>`,
+  iconSize: [20, 20],
+  iconAnchor: [10, 10],
 });
 
 // Map center updater component
@@ -66,20 +64,91 @@ const MapUpdater = ({ center }) => {
   return null;
 };
 
+// Google Places Autocomplete Input Component
+const PlacesAutocomplete = ({ value, onChange, onSelect, placeholder }) => {
+  const inputRef = useRef(null);
+  const autocompleteRef = useRef(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    // Load Google Maps script
+    if (window.google && window.google.maps && window.google.maps.places) {
+      setIsLoaded(true);
+      return;
+    }
+
+    const existingScript = document.querySelector(`script[src*="maps.googleapis.com"]`);
+    if (existingScript) {
+      existingScript.addEventListener('load', () => setIsLoaded(true));
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setIsLoaded(true);
+    document.head.appendChild(script);
+  }, []);
+
+  useEffect(() => {
+    if (!isLoaded || !inputRef.current || autocompleteRef.current) return;
+
+    try {
+      const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
+        types: ['geocode', 'establishment'],
+        componentRestrictions: { country: ['fr', 'ch', 'be'] },
+        fields: ['formatted_address', 'geometry', 'name']
+      });
+
+      autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        if (place.geometry) {
+          const address = place.formatted_address || place.name;
+          onSelect({
+            address: address,
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng()
+          });
+        }
+      });
+
+      autocompleteRef.current = autocomplete;
+    } catch (error) {
+      console.error('Google Places error:', error);
+    }
+  }, [isLoaded, onSelect]);
+
+  return (
+    <div className="relative">
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 pointer-events-none z-10" />
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full h-12 bg-[#18181B] border-2 border-zinc-700 focus:border-[#FFD700] focus:outline-none rounded-md font-medium placeholder:text-zinc-500 text-white pl-10 pr-4"
+        data-testid="destination-input"
+      />
+    </div>
+  );
+};
+
 const ClientDashboard = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [view, setView] = useState('map'); // map, history, stats, roulette
+  const [view, setView] = useState('map');
   const [loading, setLoading] = useState(false);
   
   // Map state
   const [userPosition, setUserPosition] = useState(null);
   const [activeChauffeurs, setActiveChauffeurs] = useState([]);
-  const [mapCenter, setMapCenter] = useState([48.8566, 2.3522]); // Paris default
+  const [mapCenter, setMapCenter] = useState([48.8566, 2.3522]);
   
   // Booking state
-  const [bookingStep, setBookingStep] = useState(0); // 0: idle, 1: pickup, 2: destination, 3: confirm
+  const [bookingStep, setBookingStep] = useState(0);
   const [pickup, setPickup] = useState({ address: '', lat: null, lng: null });
   const [destination, setDestination] = useState({ address: '', lat: null, lng: null });
   const [estimate, setEstimate] = useState(null);
@@ -96,31 +165,6 @@ const ClientDashboard = () => {
   const [rouletteResult, setRouletteResult] = useState(null);
   const rouletteRef = useRef(null);
 
-  // Google Maps script loading
-  const [googleLoaded, setGoogleLoaded] = useState(false);
-  const pickupAutocompleteRef = useRef(null);
-  const destAutocompleteRef = useRef(null);
-  const pickupInputRef = useRef(null);
-  const destInputRef = useRef(null);
-
-  // Load Google Maps script
-  useEffect(() => {
-    if (window.google) {
-      setGoogleLoaded(true);
-      return;
-    }
-    
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`;
-    script.async = true;
-    script.onload = () => setGoogleLoaded(true);
-    document.head.appendChild(script);
-    
-    return () => {
-      // Cleanup if needed
-    };
-  }, []);
-
   // Get user geolocation
   useEffect(() => {
     if (navigator.geolocation) {
@@ -129,11 +173,31 @@ const ClientDashboard = () => {
           const pos = [position.coords.latitude, position.coords.longitude];
           setUserPosition(pos);
           setMapCenter(pos);
-          setPickup({
-            address: 'Ma position actuelle',
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
+          // Reverse geocode to get address
+          if (window.google && window.google.maps) {
+            const geocoder = new window.google.maps.Geocoder();
+            geocoder.geocode({ location: { lat: position.coords.latitude, lng: position.coords.longitude } }, (results, status) => {
+              if (status === 'OK' && results[0]) {
+                setPickup({
+                  address: results[0].formatted_address,
+                  lat: position.coords.latitude,
+                  lng: position.coords.longitude
+                });
+              } else {
+                setPickup({
+                  address: 'Ma position actuelle',
+                  lat: position.coords.latitude,
+                  lng: position.coords.longitude
+                });
+              }
+            });
+          } else {
+            setPickup({
+              address: 'Ma position actuelle',
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            });
+          }
         },
         (error) => {
           console.error('Geolocation error:', error);
@@ -155,7 +219,7 @@ const ClientDashboard = () => {
     };
     
     fetchChauffeurs();
-    const interval = setInterval(fetchChauffeurs, 10000); // Update every 10s
+    const interval = setInterval(fetchChauffeurs, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -210,7 +274,11 @@ const ClientDashboard = () => {
     return R * c;
   };
 
-  // Handle booking
+  // Handle destination selection from autocomplete
+  const handleDestinationSelect = (place) => {
+    setDestination(place);
+  };
+
   const handleSetDestination = () => {
     if (!pickup.lat || !pickup.lng) {
       toast.error('Veuillez d\'abord définir votre position de départ');
@@ -221,19 +289,38 @@ const ClientDashboard = () => {
 
   const handleDestinationSet = async () => {
     if (!destination.address || !destination.lat) {
-      toast.error('Veuillez entrer une destination');
+      toast.error('Veuillez sélectionner une destination dans la liste');
       return;
     }
     
-    // Calculate real route with Google Maps
-    let routeData = null;
-    if (googleLoaded) {
-      routeData = await calculateRoute();
-    }
+    setLoading(true);
     
-    // Fallback to haversine if Google fails
-    const distance = routeData?.distance_km || calculateDistance(pickup.lat, pickup.lng, destination.lat, destination.lng);
-    const duration = routeData?.duration_minutes || distance * 2.5;
+    // Calculate with Google Directions API if available
+    let distance = calculateDistance(pickup.lat, pickup.lng, destination.lat, destination.lng);
+    let duration = distance * 2.5;
+    
+    if (window.google && window.google.maps) {
+      try {
+        const directionsService = new window.google.maps.DirectionsService();
+        const result = await new Promise((resolve, reject) => {
+          directionsService.route({
+            origin: { lat: pickup.lat, lng: pickup.lng },
+            destination: { lat: destination.lat, lng: destination.lng },
+            travelMode: window.google.maps.TravelMode.DRIVING
+          }, (res, status) => {
+            if (status === 'OK') resolve(res);
+            else reject(status);
+          });
+        });
+        
+        if (result.routes[0]?.legs[0]) {
+          distance = result.routes[0].legs[0].distance.value / 1000;
+          duration = result.routes[0].legs[0].duration.value / 60;
+        }
+      } catch (error) {
+        console.log('Directions API error, using fallback calculation');
+      }
+    }
     
     try {
       const response = await courseApi.estimate({
@@ -255,6 +342,8 @@ const ClientDashboard = () => {
       setBookingStep(3);
     } catch (error) {
       toast.error('Erreur lors du calcul du tarif');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -274,7 +363,6 @@ const ClientDashboard = () => {
       });
       
       if (paymentMethod === 'card') {
-        // Redirect to Stripe
         const paymentResponse = await paymentApi.createSession(response.data.course_id);
         window.location.href = paymentResponse.data.checkout_url;
       } else {
@@ -289,67 +377,6 @@ const ClientDashboard = () => {
     }
   };
 
-  // Setup Google Places Autocomplete for destination
-  useEffect(() => {
-    if (!googleLoaded || !destInputRef.current || bookingStep !== 2) return;
-    
-    const autocomplete = new window.google.maps.places.Autocomplete(destInputRef.current, {
-      types: ['address'],
-      componentRestrictions: { country: ['fr', 'ch', 'be'] } // France, Suisse, Belgique
-    });
-    
-    autocomplete.addListener('place_changed', () => {
-      const place = autocomplete.getPlace();
-      if (place.geometry) {
-        setDestination({
-          address: place.formatted_address || place.name,
-          lat: place.geometry.location.lat(),
-          lng: place.geometry.location.lng()
-        });
-      }
-    });
-    
-    destAutocompleteRef.current = autocomplete;
-  }, [googleLoaded, bookingStep]);
-
-  // Calculate route with Google Directions API
-  const calculateRoute = useCallback(async () => {
-    if (!googleLoaded || !pickup.lat || !destination.lat) return null;
-    
-    return new Promise((resolve) => {
-      const directionsService = new window.google.maps.DirectionsService();
-      
-      directionsService.route({
-        origin: { lat: pickup.lat, lng: pickup.lng },
-        destination: { lat: destination.lat, lng: destination.lng },
-        travelMode: window.google.maps.TravelMode.DRIVING
-      }, (result, status) => {
-        if (status === 'OK' && result.routes[0]) {
-          const route = result.routes[0].legs[0];
-          resolve({
-            distance_km: route.distance.value / 1000, // meters to km
-            duration_minutes: route.duration.value / 60, // seconds to minutes
-            polyline: result.routes[0].overview_polyline
-          });
-        } else {
-          resolve(null);
-        }
-      });
-    });
-  }, [googleLoaded, pickup, destination]);
-
-  // Simulate destination input (in real app, use Google Places)
-  const handleDestinationInput = (value) => {
-    setDestination({ ...destination, address: value });
-    // Simulate geocoding - in production use Google Geocoding API
-    if (value.length > 5) {
-      // Random offset from user position for demo
-      const lat = (userPosition?.[0] || 48.8566) + (Math.random() - 0.5) * 0.05;
-      const lng = (userPosition?.[1] || 2.3522) + (Math.random() - 0.5) * 0.05;
-      setDestination({ address: value, lat, lng });
-    }
-  };
-
   // Roulette spin
   const handleSpin = async () => {
     if (spinning) return;
@@ -360,14 +387,12 @@ const ClientDashboard = () => {
     try {
       const response = await clientApi.spinRoulette();
       
-      // Animate wheel
-      const degrees = 1800 + Math.random() * 360; // At least 5 full spins
+      const degrees = 1800 + Math.random() * 360;
       if (rouletteRef.current) {
         rouletteRef.current.style.setProperty('--spin-degrees', `${degrees}deg`);
         rouletteRef.current.classList.add('spin-animation');
       }
       
-      // Wait for animation
       setTimeout(() => {
         setRouletteResult(response.data);
         setSpinning(false);
@@ -376,8 +401,7 @@ const ClientDashboard = () => {
         }
         
         if (response.data.won) {
-          // Play sound
-          const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2JkI+Kd2VfYHOCkJaUiXppaGx8jJiZk4Z2amxwhJKamJKEd29yd4WRmJePgXVxdX+LlZeTi4B2c3h/ipOWk42DenV3fYaPlZKMg3t3eH2EjJGPi4N8eHl9goqOjYmDfXp5fIGHi4qHgn16eXx/hIiIhYF9e3p8f4OGhoOAfXt6fH+ChYWCf317e3x+gYODgX9+fHx8foCCgoB/fnx8fH5/gYGAfn59fX1+f4CAgH9+fX19fn9/f39+fn19fX5+fn5+fn5+fn5+fn5+fn5+');
+          const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2JkI+Kd2VfYHOCkJaUiXppaGx8jJiZk4Z2amxwhJKamJKEd29yd4WRmJePgXVxdX+LlZeTi4B2c3h/ipOWk42DenV3fYaPlZKMg3t3eH2EjJGPi4N8eHl9goqOjYmDfXp5fIGHi4qHgn16eXx/hIiIhYF9e3p8f4OGhoOAfXt6fH+ChYWCf317e3x+gYODgX9+fHx8foCCgoB/fnx8fH5/gYGAfn59fX1+f4CAgH9+fX19fn9/f39+fn19fX5+fn5+fn5+fn5+fn5+fn5+fn5+');
           audio.play().catch(() => {});
           toast.success(`Félicitations ! Vous avez gagné ${response.data.prize} !`);
         } else {
@@ -478,7 +502,7 @@ const ClientDashboard = () => {
         
         <img src={LOGO_URL} alt="TaxiG" className="h-10" />
         
-        <div className="w-10" /> {/* Spacer */}
+        <div className="w-10" />
       </header>
 
       {/* Main Content */}
@@ -492,8 +516,9 @@ const ClientDashboard = () => {
               className="w-full h-full z-0"
               zoomControl={false}
             >
+              {/* CARTE EN COULEUR - OpenStreetMap standard */}
               <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               />
               <MapUpdater center={mapCenter} />
@@ -562,7 +587,10 @@ const ClientDashboard = () => {
                     <Button 
                       variant="ghost" 
                       size="icon"
-                      onClick={() => setBookingStep(0)}
+                      onClick={() => {
+                        setBookingStep(0);
+                        setDestination({ address: '', lat: null, lng: null });
+                      }}
                       className="text-white"
                       data-testid="back-to-start-btn"
                     >
@@ -570,24 +598,30 @@ const ClientDashboard = () => {
                     </Button>
                     <h3 className="text-white font-bold text-lg">Choisir la destination</h3>
                   </div>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 z-10" />
-                    <Input
-                      ref={destInputRef}
-                      placeholder="Entrez votre destination..."
-                      className="input-taxi pl-10"
-                      value={destination.address}
-                      onChange={(e) => setDestination({ ...destination, address: e.target.value })}
-                      data-testid="destination-input"
-                    />
-                  </div>
+                  
+                  {/* Google Places Autocomplete */}
+                  <PlacesAutocomplete
+                    value={destination.address}
+                    onChange={(val) => setDestination({ ...destination, address: val })}
+                    onSelect={handleDestinationSelect}
+                    placeholder="Tapez une adresse..."
+                  />
+                  
+                  <p className="text-zinc-500 text-xs">
+                    Commencez à taper et sélectionnez une adresse dans la liste
+                  </p>
+                  
                   <Button 
                     className="btn-taxi w-full h-12"
                     onClick={handleDestinationSet}
-                    disabled={!destination.address}
+                    disabled={!destination.lat || loading}
                     data-testid="confirm-destination-btn"
                   >
-                    Valider la destination
+                    {loading ? (
+                      <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Calcul en cours...</>
+                    ) : (
+                      'Valider la destination'
+                    )}
                   </Button>
                 </div>
               )}
@@ -804,7 +838,6 @@ const ClientDashboard = () => {
             <p className="text-zinc-400 mb-8 text-center">Tentez votre chance une fois par jour !</p>
             
             <div className="relative mb-8">
-              {/* Wheel */}
               <div 
                 ref={rouletteRef}
                 className="w-64 h-64 rounded-full border-8 border-[#FFD700] relative overflow-hidden"
@@ -819,7 +852,6 @@ const ClientDashboard = () => {
                 </div>
               </div>
               
-              {/* Pointer */}
               <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                 <div className="w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[24px] border-t-[#FFD700]" />
               </div>
