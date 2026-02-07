@@ -742,24 +742,28 @@ const ChauffeurDashboard = () => {
           <>
             <MapContainer 
               center={position || [48.8566, 2.3522]}
-              zoom={14}
+              zoom={16}
               className="w-full h-full z-0"
               zoomControl={false}
-              scrollWheelZoom={true}
+              scrollWheelZoom={false}
               doubleClickZoom={true}
               dragging={true}
+              touchZoom={true}
+              zoomSnap={0.5}
+              zoomDelta={0.5}
             >
               <TileLayer
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution='&copy; OpenStreetMap'
               />
               
-              {/* Smart map controller - centers between chauffeur and client like Uber */}
+              {/* Smooth real-time tracking - follows chauffeur like Google Maps navigation */}
               <MapController 
                 chauffeurPos={position}
                 clientPos={getClientPos()}
                 destinationPos={getDestPos()}
                 courseStatus={currentCourse?.status}
+                isFollowing={isFollowing}
               />
               
               {/* Chauffeur position (yellow car) */}
