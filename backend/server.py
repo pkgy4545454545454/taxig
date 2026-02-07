@@ -879,6 +879,8 @@ async def get_active_chauffeurs():
         {"_id": 0, "password": 0, "hashed_password": 0, "permis_conduire": 0, "permis_sejour": 0}
     ).to_list(100)
     
+    print(f"[DEBUG] Found {len(chauffeurs)} chauffeurs from DB")
+    
     # Normalize position format for frontend
     result = []
     for c in chauffeurs:
@@ -890,19 +892,21 @@ async def get_active_chauffeurs():
         }
         
         # Handle GeoJSON format
-        if c.get("position") and isinstance(c["position"], dict):
-            if "coordinates" in c["position"]:
+        pos = c.get("position")
+        if pos and isinstance(pos, dict):
+            if "coordinates" in pos and len(pos["coordinates"]) >= 2:
                 # GeoJSON format [lng, lat] -> {lat, lng}
                 driver["position"] = {
-                    "lat": c["position"]["coordinates"][1],
-                    "lng": c["position"]["coordinates"][0]
+                    "lat": pos["coordinates"][1],
+                    "lng": pos["coordinates"][0]
                 }
-            elif "lat" in c["position"]:
-                driver["position"] = c["position"]
+            elif "lat" in pos and "lng" in pos:
+                driver["position"] = {"lat": pos["lat"], "lng": pos["lng"]}
         
         if driver.get("position"):
             result.append(driver)
     
+    print(f"[DEBUG] Returning {len(result)} chauffeurs")
     return result
 
 # ========== ADMIN ROUTES ==========
