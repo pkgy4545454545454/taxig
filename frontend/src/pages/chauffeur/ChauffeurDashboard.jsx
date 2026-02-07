@@ -53,41 +53,20 @@ const destinationIcon = new L.DivIcon({
   iconAnchor: [15, 15],
 });
 
-// Map component - SMOOTH REAL-TIME TRACKING like Google Maps
-const MapController = ({ chauffeurPos, clientPos, destinationPos, courseStatus, isFollowing }) => {
+// Map component - TOUJOURS CENTRÉ SUR LE CHAUFFEUR comme Google Maps Navigation
+const MapController = ({ chauffeurPos }) => {
   const map = useMap();
-  const isInitializedRef = useRef(false);
   
   useEffect(() => {
     if (!map || !chauffeurPos) return;
     
-    // Quand on a une course assignée - montrer chauffeur et client
-    if (courseStatus === 'assigned' && clientPos) {
-      if (!isInitializedRef.current) {
-        // Premier affichage - fit bounds pour voir les deux points
-        const bounds = L.latLngBounds([
-          L.latLng(chauffeurPos[0], chauffeurPos[1]),
-          L.latLng(clientPos[0], clientPos[1])
-        ]);
-        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17, animate: true });
-        isInitializedRef.current = true;
-      } else if (isFollowing) {
-        // Suivi fluide du chauffeur
-        map.setView(L.latLng(chauffeurPos[0], chauffeurPos[1]), 17, { animate: true, duration: 0.3 });
-      }
-    } 
-    // En course - suivre le chauffeur vers la destination
-    else if (courseStatus === 'in_progress' && destinationPos) {
-      if (isFollowing) {
-        map.setView(L.latLng(chauffeurPos[0], chauffeurPos[1]), 17, { animate: true, duration: 0.3 });
-      }
-    } 
-    // Pas de course - centrer sur le chauffeur avec zoom max
-    else if (!courseStatus) {
-      map.setView(L.latLng(chauffeurPos[0], chauffeurPos[1]), 18, { animate: true });
-      isInitializedRef.current = false;
-    }
-  }, [map, chauffeurPos, clientPos, destinationPos, courseStatus, isFollowing]);
+    // TOUJOURS centrer sur le chauffeur - suivi temps réel
+    map.setView(L.latLng(chauffeurPos[0], chauffeurPos[1]), 17, { 
+      animate: true, 
+      duration: 0.5,
+      easeLinearity: 0.5
+    });
+  }, [map, chauffeurPos]);
   
   return null;
 };
