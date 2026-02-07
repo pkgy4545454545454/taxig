@@ -53,54 +53,51 @@ const destinationIcon = new L.DivIcon({
   iconAnchor: [15, 15],
 });
 
-// Map component to fit bounds properly - UBER STYLE
-const MapController = ({ chauffeurPos, clientPos, destinationPos, courseStatus }) => {
+// Map component - SMOOTH REAL-TIME TRACKING like Google Maps
+const MapController = ({ chauffeurPos, clientPos, destinationPos, courseStatus, isFollowing }) => {
   const map = useMap();
-  const lastBoundsKey = useRef('');
+  const lastCenterRef = useRef(null);
+  const isInitializedRef = useRef(false);
   
   useEffect(() => {
-    if (!map) return;
+    if (!map || !chauffeurPos) return;
     
-    const points = [];
-    
-    // Add chauffeur position
-    if (chauffeurPos) {
-      points.push(L.latLng(chauffeurPos[0], chauffeurPos[1]));
-    }
-    
-    // Add client position if going to pickup (assigned status)
-    if (clientPos && courseStatus === 'assigned') {
-      points.push(L.latLng(clientPos[0], clientPos[1]));
-    }
-    
-    // Add destination if in progress
-    if (destinationPos && courseStatus === 'in_progress') {
-      points.push(L.latLng(destinationPos[0], destinationPos[1]));
-    }
-    
-    // Create a key to detect significant changes
-    const boundsKey = points.map(p => `${p.lat.toFixed(3)},${p.lng.toFixed(3)}`).join('|') + '|' + courseStatus;
-    
-    // Only recenter if bounds changed significantly
-    if (boundsKey !== lastBoundsKey.current) {
-      lastBoundsKey.current = boundsKey;
-      
-      if (points.length >= 2) {
-        const bounds = L.latLngBounds(points);
-        // Fit with good padding like Uber - larger padding for better visibility
-        map.fitBounds(bounds, { 
-          padding: [80, 80],
-          maxZoom: 16,
-          animate: true,
-          duration: 0.5
-        });
-        console.log('Map centered between', points.length, 'points');
-      } else if (points.length === 1) {
-        map.setView(points[0], 15, { animate: true });
-        console.log('Map centered on single point');
+    // If we have a course, fit bounds initially then follow chauffeur smoothly
+    if (courseStatus === 'assigned' && clientPos) {
+      // Initial fit to show both points
+      if (!isInitializedRef.current) {
+        const bounds = L.latLngBounds([
+          L.latLng(chauffeurPos[0], chauffeurPos[1]),
+          L.latLng(clientPos[0], clientPos[1])
+        ]);
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15, animate: true });
+        isInitializedRef.current = true;
+      } else if (isFollowing) {
+        // Smooth follow chauffeur - pan smoothly like Google Maps navigation
+        map.panTo(L.latLng(chauffeurPos[0], chauffeurPos[1]), { animate: true, duration: 0.5 });
+      }
+    } else if (courseStatus === 'in_progress' && destinationPos) {
+      // In progress - follow chauffeur towards destination
+      if (isFollowing) {
+        map.panTo(L.latLng(chauffeurPos[0], chauffeurPos[1]), { animate: true, duration: 0.5 });
+      }
+    } else if (!courseStatus) {
+      // No course - center on chauffeur
+      if (!isInitializedRef.current || isFollowing) {
+        map.setView(L.latLng(chauffeurPos[0], chauffeurPos[1]), 16, { animate: true });
+        isInitializedRef.current = true;
       }
     }
-  }, [map, chauffeurPos, clientPos, destinationPos, courseStatus]);
+    
+    lastCenterRef.current = chauffeurPos;
+  }, [map, chauffeurPos, clientPos, destinationPos, courseStatus, isFollowing]);
+  
+  // Reset initialization when course changes
+  useEffect(() => {
+    if (!courseStatus) {
+      isInitializedRef.current = false;
+    }
+  }, [courseStatus]);
   
   return null;
 };
