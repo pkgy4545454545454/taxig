@@ -5,7 +5,7 @@ import L from 'leaflet';
 import { 
   Menu, Power, MapPin, Clock, DollarSign, Calendar, 
   CheckCircle, XCircle, Navigation, LogOut,
-  AlertCircle, Timer, Route
+  AlertCircle, Timer, Route, Download, FileText
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../../components/ui/sheet';
@@ -14,6 +14,8 @@ import { Calendar as CalendarComponent } from '../../components/ui/calendar';
 import { toast } from 'sonner';
 import { chauffeurApi } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import 'leaflet/dist/leaflet.css';
 
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
