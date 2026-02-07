@@ -639,17 +639,6 @@ const ChauffeurDashboard = () => {
     navigate('/');
   };
 
-  // Get positions for map controller
-  const getClientPos = () => {
-    if (!currentCourse) return null;
-    return [currentCourse.pickup_lat, currentCourse.pickup_lng];
-  };
-
-  const getDestPos = () => {
-    if (!currentCourse || currentCourse.status !== 'in_progress') return null;
-    return [currentCourse.destination_lat, currentCourse.destination_lng];
-  };
-
   return (
     <div className="h-screen flex flex-col bg-[#09090B]">
       {/* Notification audio */}
