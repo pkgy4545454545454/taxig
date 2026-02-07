@@ -193,7 +193,12 @@ const ChauffeurDashboard = () => {
 
   // Calculate route with Google Directions
   const calculateRoute = useCallback(async (origin, destination) => {
+    console.log('=== CALCUL ROUTE ===');
+    console.log('Origin:', origin);
+    console.log('Destination:', destination);
+    
     if (!window.google || !window.google.maps) {
+      console.warn('Google Maps API not available, using straight line');
       // Fallback: create simple straight line
       setRoutePolyline([[origin.lat, origin.lng], [destination.lat, destination.lng]]);
       return;
@@ -208,6 +213,7 @@ const ChauffeurDashboard = () => {
           destination: { lat: destination.lat, lng: destination.lng },
           travelMode: window.google.maps.TravelMode.DRIVING
         }, (res, status) => {
+          console.log('Directions API status:', status);
           if (status === 'OK') resolve(res);
           else reject(status);
         });
@@ -217,8 +223,12 @@ const ChauffeurDashboard = () => {
         const route = result.routes[0];
         const leg = route.legs[0];
         
-        // Decode the polyline
-        const polyline = decodePolyline(route.overview_polyline);
+        // Decode the polyline - overview_polyline is an object with 'points' property
+        const encodedPolyline = route.overview_polyline.points || route.overview_polyline;
+        console.log('Encoded polyline type:', typeof encodedPolyline);
+        
+        const polyline = decodePolyline(encodedPolyline);
+        console.log('Decoded polyline points:', polyline.length);
         setRoutePolyline(polyline);
         
         // Calculate ETA
@@ -232,11 +242,20 @@ const ChauffeurDashboard = () => {
           durationValue: leg.duration.value / 60, // minutes
           eta: eta.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
         });
+        
+        console.log('Route calculated successfully:', leg.distance.text, leg.duration.text);
       }
     } catch (error) {
       console.error('Route calculation error:', error);
       // Fallback to straight line
       setRoutePolyline([[origin.lat, origin.lng], [destination.lat, destination.lng]]);
+      setRouteInfo({
+        distance: 'Calcul en cours...',
+        distanceValue: 0,
+        duration: '-',
+        durationValue: 0,
+        eta: '-'
+      });
     }
   }, []);
 
