@@ -1,0 +1,100 @@
+{
+  "project_name": "TaxiG",
+  "design_philosophy": {
+    "archetype": "The Performance Pro",
+    "core_principles": [
+      "Speed & Clarity: Information must be digestible in milliseconds (for drivers)",
+      "High Contrast: Black, White, and Electric Yellow for maximum outdoor visibility",
+      "Fluid Motion: The map is the hero; UI floats above it like a HUD",
+      "Tactile Feedback: Buttons should feel 'pressable' with clear active states"
+    ],
+    "emotional_tone": "Reliable, Urban, Efficient, Modern"
+  },
+  "typography": {
+    "font_family_heading": "Chivo, sans-serif",
+    "font_family_body": "Public Sans, sans-serif",
+    "instructions": "Use Chivo for all Headings (h1-h4). It has a strong, automotive character. Use Public Sans for body text, inputs, and data to ensure maximum legibility.",
+    "scale": {
+      "h1": "text-4xl md:text-5xl font-black tracking-tight",
+      "h2": "text-3xl md:text-4xl font-bold tracking-tight",
+      "h3": "text-2xl font-bold",
+      "body": "text-base leading-relaxed",
+      "small": "text-sm font-medium tracking-wide",
+      "tiny": "text-xs font-bold uppercase tracking-widest"
+    }
+  },
+  "colors": {
+    "primary": {
+      "name": "Taxi Yellow",
+      "hex": "#FFD700",
+      "usage": "Primary Actions (Book Ride, Accept), Active States, Highlights"
+    },
+    "secondary": {
+      "name": "Asphalt Black",
+      "hex": "#09090B",
+      "usage": "Backgrounds, Text (on Light), Borders (on Light)"
+    },
+    "background": {
+      "light": "#FFFFFF",
+      "dark": "#09090B",
+      "surface_light": "#F4F4F5",
+      "surface_dark": "#18181B"
+    },
+    "text": {
+      "primary_light": "#09090B",
+      "secondary_light": "#52525B",
+      "primary_dark": "#FFFFFF",
+      "secondary_dark": "#A1A1AA"
+    },
+    "status": {
+      "success": "#22C55E",
+      "error": "#EF4444",
+      "warning": "#F59E0B"
+    }
+  },
+  "ui_components": {
+    "buttons": {
+      "primary": "bg-[#FFD700] text-black hover:bg-[#FACC15] font-bold rounded-none uppercase tracking-wider shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all",
+      "secondary": "bg-white border-2 border-black text-black hover:bg-gray-100 font-bold rounded-none shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none",
+      "ghost": "bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground font-medium"
+    },
+    "cards": {
+      "style": "bg-background border border-border shadow-sm rounded-lg p-6",
+      "driver_panel": "fixed bottom-0 left-0 right-0 bg-background border-t border-border rounded-t-3xl shadow-xl p-6 z-50 transform transition-transform duration-300 ease-in-out"
+    },
+    "inputs": {
+      "style": "h-12 bg-background border-2 border-input focus:border-black focus:ring-0 rounded-md font-medium placeholder:text-muted-foreground"
+    }
+  },
+  "map_integration": {
+    "library": "react-leaflet",
+    "styles": "CartoDB.Voyager (Light) or CartoDB.DarkMatter (Dark) for clean, distraction-free maps.",
+    "car_marker": "Use 'react-leaflet-animated-marker' for smooth car movement. Use a custom SVG icon for the car (yellow/black chevron or top-down car vector).",
+    "tiles_url": {
+      "light": "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+      "dark": "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+    }
+  },
+  "assets": {
+    "logo": "https://customer-assets.emergentagent.com/job_geolocab-platform/artifacts/6p3uaynm_1000103457-removebg-preview.png",
+    "images": {
+      "driver_hero": "https://images.unsplash.com/photo-1561527960-4d3db0b66f47?auto=format&fit=crop&q=80",
+      "passenger_hero": "https://images.unsplash.com/photo-1604343670513-af01df1260a1?auto=format&fit=crop&q=80",
+      "map_placeholder": "https://images.unsplash.com/photo-1625062295005-a9be70d46c19?auto=format&fit=crop&q=80"
+    },
+    "icons": "Use 'lucide-react' for UI icons (User, MapPin, CreditCard, Menu, X, Check, Bell, Navigation)."
+  },
+  "animations": {
+    "page_transition": "initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}",
+    "drawer_slide": "initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}",
+    "pulse": "animate-pulse"
+  },
+  "universal_guidelines": [
+    "Do not use gradients for backgrounds; stick to flat, high-contrast colors.",
+    "Ensure all touch targets are at least 44x44px for mobile drivers.",
+    "Use Skeleton loaders instead of spinners for data fetching states.",
+    "Always provide a 'Back' button in sub-views on mobile.",
+    "Map must be full-screen on mobile, with UI overlaid.",
+    "Use data-testid attributes for all interactive elements."
+  ]
+}
