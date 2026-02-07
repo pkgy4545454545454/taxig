@@ -731,15 +731,13 @@ const ChauffeurDashboard = () => {
           <>
             <MapContainer 
               center={position || [48.8566, 2.3522]}
-              zoom={16}
+              zoom={18}
               className="w-full h-full z-0"
               zoomControl={false}
               scrollWheelZoom={false}
               doubleClickZoom={true}
               dragging={true}
               touchZoom={true}
-              zoomSnap={0.5}
-              zoomDelta={0.5}
             >
               <TileLayer
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
