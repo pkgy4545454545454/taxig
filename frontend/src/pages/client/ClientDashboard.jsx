@@ -167,18 +167,7 @@ const ClientDashboard = () => {
 
   // Get user geolocation
   useEffect(() => {
-    // Set default position (Paris center) in case geolocation fails
-    const defaultPos = { lat: 48.8566, lng: 2.3522 };
-    
-    const setDefaultPickup = () => {
-      setPickup({
-        address: 'Paris, France',
-        lat: defaultPos.lat,
-        lng: defaultPos.lng
-      });
-      setUserPosition([defaultPos.lat, defaultPos.lng]);
-    };
-    
+    // Ne pas utiliser de position par défaut - attendre la vraie géolocalisation
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -213,24 +202,13 @@ const ClientDashboard = () => {
         },
         (error) => {
           console.error('Geolocation error:', error);
-          // Set default position when geolocation fails
-          setDefaultPickup();
+          toast.error('Impossible d\'obtenir votre position. Activez la géolocalisation.');
         },
-        { timeout: 5000 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     } else {
-      // No geolocation support, use default
-      setDefaultPickup();
+      toast.error('Géolocalisation non supportée par votre navigateur');
     }
-    
-    // Set default after 3 seconds if still no position
-    const timeout = setTimeout(() => {
-      if (!pickup.lat) {
-        setDefaultPickup();
-      }
-    }, 3000);
-    
-    return () => clearTimeout(timeout);
   }, []);
 
   // Fetch active chauffeurs
