@@ -157,12 +157,116 @@ const ChauffeurDashboard = () => {
   
   // Revenus
   const [revenus, setRevenus] = useState(null);
+  const [revenusDetails, setRevenusDetails] = useState([]);
   
   // Calendar
   const [indisponibilites, setIndisponibilites] = useState([]);
   
+  // Map following mode - like Google Maps navigation
+  const [isFollowing, setIsFollowing] = useState(true);
+  
   // Audio ref
   const audioRef = useRef(null);
+  
+  // PDF Export function for accounting
+  const exportRevenusPDF = useCallback(() => {
+    if (!revenus || !profile) {
+      toast.error('Veuillez charger les revenus d\'abord');
+      return;
+    }
+    
+    const doc = new jsPDF();
+    const today = new Date().toLocaleDateString('fr-FR');
+    const periodStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString('fr-FR');
+    
+    // Header with TaxiG branding
+    doc.setFillColor(9, 9, 11); // #09090B
+    doc.rect(0, 0, 210, 40, 'F');
+    doc.setTextColor(255, 215, 0); // Gold
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TaxiG', 20, 25);
+    doc.setFontSize(12);
+    doc.setTextColor(255, 255, 255);
+    doc.text('Rapport de Revenus - Comptabilité', 60, 25);
+    
+    // Driver info
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Informations Chauffeur', 20, 55);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.text(`Nom: ${profile.prenom} ${profile.nom}`, 20, 65);
+    doc.text(`Code Chauffeur: ${profile.code_chauffeur}`, 20, 72);
+    doc.text(`Date du rapport: ${today}`, 20, 79);
+    doc.text(`Période: ${periodStart} - ${today}`, 20, 86);
+    
+    // Financial summary
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Résumé Financier (30 derniers jours)', 20, 102);
+    
+    // Summary table
+    const summaryData = [
+      ['Revenus Brut', `${revenus.revenus_brut_30j?.toFixed(2) || '0.00'} €`],
+      ['Commission TaxiG (15%)', `- ${revenus.commission_due?.toFixed(2) || '0.00'} €`],
+      ['Revenus Net', `${revenus.revenus_net_30j?.toFixed(2) || '0.00'} €`],
+      ['Nombre de courses', `${revenus.nombre_courses_30j || 0}`],
+    ];
+    
+    doc.autoTable({
+      startY: 108,
+      head: [['Description', 'Montant']],
+      body: summaryData,
+      theme: 'striped',
+      headStyles: { fillColor: [255, 215, 0], textColor: [0, 0, 0], fontStyle: 'bold' },
+      styles: { fontSize: 11 },
+      columnStyles: {
+        0: { cellWidth: 100 },
+        1: { cellWidth: 60, halign: 'right' }
+      }
+    });
+    
+    // Courses detail if available
+    if (revenusDetails.length > 0) {
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      const detailY = doc.lastAutoTable.finalY + 15;
+      doc.text('Détail des Courses', 20, detailY);
+      
+      const coursesData = revenusDetails.map(c => [
+        c.commande_no || '-',
+        new Date(c.created_at).toLocaleDateString('fr-FR'),
+        c.client_nom || '-',
+        `${c.prix?.toFixed(2) || '0.00'} €`
+      ]);
+      
+      doc.autoTable({
+        startY: detailY + 6,
+        head: [['N° Commande', 'Date', 'Client', 'Montant']],
+        body: coursesData,
+        theme: 'striped',
+        headStyles: { fillColor: [255, 215, 0], textColor: [0, 0, 0], fontStyle: 'bold' },
+        styles: { fontSize: 9 },
+      });
+    }
+    
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(128, 128, 128);
+      doc.text(`TaxiG - Document généré automatiquement le ${today}`, 20, 285);
+      doc.text(`Page ${i} / ${pageCount}`, 180, 285);
+    }
+    
+    // Download
+    const fileName = `TaxiG_Revenus_${profile.code_chauffeur}_${today.replace(/\//g, '-')}.pdf`;
+    doc.save(fileName);
+    toast.success('PDF téléchargé avec succès !');
+  }, [revenus, profile, revenusDetails]);
 
   // Load Google Maps script
   useEffect(() => {
