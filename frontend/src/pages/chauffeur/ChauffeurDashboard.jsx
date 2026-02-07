@@ -511,6 +511,7 @@ const ChauffeurDashboard = () => {
       
       if (accept) {
         toast.success('Course acceptée !');
+        setCourseStartTime(Date.now()); // Démarrer le chrono dès l'acceptation
         
         // Calculate route immediately to pickup - utiliser position réelle uniquement
         if (position) {
