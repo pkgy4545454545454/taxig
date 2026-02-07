@@ -319,11 +319,23 @@ const ClientDashboard = () => {
       return;
     }
     
+    if (!pickup.lat || !pickup.lng) {
+      toast.error('Position de départ non disponible. Veuillez patienter.');
+      return;
+    }
+    
     setLoading(true);
+    
+    // Log pour debug
+    console.log('=== CALCUL DE DISTANCE ===');
+    console.log('Pickup:', pickup.lat, pickup.lng, pickup.address);
+    console.log('Destination:', destination.lat, destination.lng, destination.address);
     
     // Calculate with Google Directions API if available
     let distance = calculateDistance(pickup.lat, pickup.lng, destination.lat, destination.lng);
     let duration = distance * 2.5;
+    
+    console.log('Distance Haversine (fallback):', distance, 'km');
     
     if (window.google && window.google.maps) {
       try {
@@ -334,6 +346,7 @@ const ClientDashboard = () => {
             destination: { lat: destination.lat, lng: destination.lng },
             travelMode: window.google.maps.TravelMode.DRIVING
           }, (res, status) => {
+            console.log('Google Directions status:', status);
             if (status === 'OK') resolve(res);
             else reject(status);
           });
@@ -342,11 +355,17 @@ const ClientDashboard = () => {
         if (result.routes[0]?.legs[0]) {
           distance = result.routes[0].legs[0].distance.value / 1000;
           duration = result.routes[0].legs[0].duration.value / 60;
+          console.log('Distance Google Directions:', distance, 'km');
+          console.log('Durée Google Directions:', duration, 'min');
         }
       } catch (error) {
-        console.log('Directions API error, using fallback calculation');
+        console.warn('Directions API error, using fallback calculation:', error);
       }
+    } else {
+      console.warn('Google Maps API not loaded, using Haversine calculation');
     }
+    
+    console.log('Distance finale envoyée au backend:', distance, 'km');
     
     try {
       const response = await courseApi.estimate({
