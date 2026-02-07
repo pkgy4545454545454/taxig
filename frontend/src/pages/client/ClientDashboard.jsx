@@ -167,6 +167,18 @@ const ClientDashboard = () => {
 
   // Get user geolocation
   useEffect(() => {
+    // Set default position (Paris center) in case geolocation fails
+    const defaultPos = { lat: 48.8566, lng: 2.3522 };
+    
+    const setDefaultPickup = () => {
+      setPickup({
+        address: 'Paris, France',
+        lat: defaultPos.lat,
+        lng: defaultPos.lng
+      });
+      setUserPosition([defaultPos.lat, defaultPos.lng]);
+    };
+    
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
