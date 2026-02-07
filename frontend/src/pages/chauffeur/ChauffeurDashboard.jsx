@@ -54,7 +54,7 @@ const destinationIcon = new L.DivIcon({
 // Map component to fit bounds properly - UBER STYLE
 const MapController = ({ chauffeurPos, clientPos, destinationPos, courseStatus }) => {
   const map = useMap();
-  const hasInitialized = useRef(false);
+  const lastBoundsKey = useRef('');
   
   useEffect(() => {
     if (!map) return;
@@ -66,8 +66,8 @@ const MapController = ({ chauffeurPos, clientPos, destinationPos, courseStatus }
       points.push(L.latLng(chauffeurPos[0], chauffeurPos[1]));
     }
     
-    // Add client position if going to pickup
-    if (clientPos && courseStatus !== 'in_progress') {
+    // Add client position if going to pickup (assigned status)
+    if (clientPos && courseStatus === 'assigned') {
       points.push(L.latLng(clientPos[0], clientPos[1]));
     }
     
@@ -76,19 +76,27 @@ const MapController = ({ chauffeurPos, clientPos, destinationPos, courseStatus }
       points.push(L.latLng(destinationPos[0], destinationPos[1]));
     }
     
-    if (points.length >= 2) {
-      const bounds = L.latLngBounds(points);
-      // Fit with good padding like Uber
-      map.fitBounds(bounds, { 
-        padding: [100, 100],
-        maxZoom: 15,
-        animate: true,
-        duration: 0.5
-      });
-      hasInitialized.current = true;
-    } else if (points.length === 1 && !hasInitialized.current) {
-      map.setView(points[0], 15, { animate: true });
-      hasInitialized.current = true;
+    // Create a key to detect significant changes
+    const boundsKey = points.map(p => `${p.lat.toFixed(3)},${p.lng.toFixed(3)}`).join('|') + '|' + courseStatus;
+    
+    // Only recenter if bounds changed significantly
+    if (boundsKey !== lastBoundsKey.current) {
+      lastBoundsKey.current = boundsKey;
+      
+      if (points.length >= 2) {
+        const bounds = L.latLngBounds(points);
+        // Fit with good padding like Uber - larger padding for better visibility
+        map.fitBounds(bounds, { 
+          padding: [80, 80],
+          maxZoom: 16,
+          animate: true,
+          duration: 0.5
+        });
+        console.log('Map centered between', points.length, 'points');
+      } else if (points.length === 1) {
+        map.setView(points[0], 15, { animate: true });
+        console.log('Map centered on single point');
+      }
     }
   }, [map, chauffeurPos, clientPos, destinationPos, courseStatus]);
   
