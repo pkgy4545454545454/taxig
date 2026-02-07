@@ -875,10 +875,35 @@ async def cancel_course(course_id: str, user=Depends(get_current_user)):
 @api_router.get("/chauffeurs/actifs")
 async def get_active_chauffeurs():
     chauffeurs = await db.chauffeurs.find(
-        {"is_online": True, "position": {"$ne": None}},
-        {"_id": 0, "password": 0, "permis_conduire": 0, "permis_sejour": 0}
+        {"$or": [{"is_online": True}, {"status": "online"}], "position": {"$ne": None}},
+        {"_id": 0, "password": 0, "hashed_password": 0, "permis_conduire": 0, "permis_sejour": 0}
     ).to_list(100)
-    return chauffeurs
+    
+    # Normalize position format for frontend
+    result = []
+    for c in chauffeurs:
+        driver = {
+            "id": c.get("id") or c.get("code_chauffeur"),
+            "nom": c.get("nom", ""),
+            "prenom": c.get("prenom", ""),
+            "vehicule": c.get("vehicule", {}),
+        }
+        
+        # Handle GeoJSON format
+        if c.get("position") and isinstance(c["position"], dict):
+            if "coordinates" in c["position"]:
+                # GeoJSON format [lng, lat] -> {lat, lng}
+                driver["position"] = {
+                    "lat": c["position"]["coordinates"][1],
+                    "lng": c["position"]["coordinates"][0]
+                }
+            elif "lat" in c["position"]:
+                driver["position"] = c["position"]
+        
+        if driver.get("position"):
+            result.append(driver)
+    
+    return result
 
 # ========== ADMIN ROUTES ==========
 
