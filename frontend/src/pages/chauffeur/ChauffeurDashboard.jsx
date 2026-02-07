@@ -497,13 +497,14 @@ const ChauffeurDashboard = () => {
       if (accept) {
         toast.success('Course acceptée !');
         
-        // Calculate route immediately to pickup
-        const currentPos = position || [48.8566, 2.3522]; // Default Paris if no position
-        console.log('Calculating route after accepting course...');
-        calculateRoute(
-          { lat: currentPos[0], lng: currentPos[1] },
-          { lat: incomingRequest.pickup_lat, lng: incomingRequest.pickup_lng }
-        );
+        // Calculate route immediately to pickup - utiliser position réelle uniquement
+        if (position) {
+          console.log('Calculating route after accepting course...');
+          calculateRoute(
+            { lat: position[0], lng: position[1] },
+            { lat: incomingRequest.pickup_lat, lng: incomingRequest.pickup_lng }
+          );
+        }
       } else {
         toast.info('Course refusée');
       }
