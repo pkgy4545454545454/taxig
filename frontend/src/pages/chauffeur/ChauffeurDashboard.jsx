@@ -541,6 +541,7 @@ const ChauffeurDashboard = () => {
       await chauffeurApi.startCourse(currentCourse.id);
       const updatedCourse = { ...currentCourse, status: 'in_progress' };
       setCurrentCourse(updatedCourse);
+      setCourseStartTime(Date.now()); // Démarrer le chrono
       toast.success('Course démarrée - En route vers la destination');
       
       // Recalculate route to destination
@@ -565,6 +566,9 @@ const ChauffeurDashboard = () => {
       setCurrentCourse(null);
       setRoutePolyline([]);
       setRouteInfo(null);
+      setCourseStartTime(null); // Reset le chrono
+      setElapsedTime(0);
+      setRemainingTime(null);
       fetchProfile();
     } catch (error) {
       toast.error('Erreur lors de la finalisation');
