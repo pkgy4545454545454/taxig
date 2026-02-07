@@ -571,12 +571,13 @@ const ClientDashboard = () => {
                     <h3 className="text-white font-bold text-lg">Choisir la destination</h3>
                   </div>
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 z-10" />
                     <Input
+                      ref={destInputRef}
                       placeholder="Entrez votre destination..."
                       className="input-taxi pl-10"
                       value={destination.address}
-                      onChange={(e) => handleDestinationInput(e.target.value)}
+                      onChange={(e) => setDestination({ ...destination, address: e.target.value })}
                       data-testid="destination-input"
                     />
                   </div>
