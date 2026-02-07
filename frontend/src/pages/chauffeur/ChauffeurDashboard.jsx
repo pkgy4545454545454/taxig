@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, useMap, Polyline, Popup } from 'react-
 import L from 'leaflet';
 import { 
   Menu, Power, MapPin, Clock, DollarSign, Calendar, 
-  CheckCircle, XCircle, Phone, Navigation, LogOut,
+  CheckCircle, XCircle, Navigation, LogOut,
   AlertCircle, Timer, Route
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -34,55 +34,64 @@ const chauffeurIcon = new L.DivIcon({
 // Client pickup icon (blue pulsing)
 const clientPickupIcon = new L.DivIcon({
   className: 'client-pickup-marker',
-  html: `<div style="position: relative; width: 40px; height: 40px;">
-    <div style="position: absolute; inset: 0; background: rgba(59, 130, 246, 0.3); border-radius: 50%; animation: pulse 2s infinite;"></div>
-    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 24px; height: 24px; background: #3B82F6; border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>
-    <div style="position: absolute; top: -8px; left: 50%; transform: translateX(-50%); background: #3B82F6; color: white; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">CLIENT</div>
-  </div>
-  <style>
-    @keyframes pulse {
-      0% { transform: scale(0.8); opacity: 1; }
-      100% { transform: scale(2); opacity: 0; }
-    }
-  </style>`,
-  iconSize: [40, 40],
-  iconAnchor: [20, 20],
+  html: `<div style="position: relative; width: 30px; height: 30px;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 20px; height: 20px; background: #3B82F6; border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.4);"></div>
+  </div>`,
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
 });
 
 // Destination icon (green)
 const destinationIcon = new L.DivIcon({
   className: 'destination-marker',
-  html: `<div style="position: relative; width: 40px; height: 40px;">
-    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 24px; height: 24px; background: #22C55E; border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>
-    <div style="position: absolute; top: -8px; left: 50%; transform: translateX(-50%); background: #22C55E; color: white; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">ARRIVÉE</div>
+  html: `<div style="position: relative; width: 30px; height: 30px;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 20px; height: 20px; background: #22C55E; border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.4);"></div>
   </div>`,
-  iconSize: [40, 40],
-  iconAnchor: [20, 20],
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
 });
 
-// Map bounds fitter component
-const FitBounds = ({ bounds, padding = 80 }) => {
+// Map component to fit bounds properly - UBER STYLE
+const MapController = ({ chauffeurPos, clientPos, destinationPos, courseStatus }) => {
   const map = useMap();
+  const hasInitialized = useRef(false);
+  
   useEffect(() => {
-    if (bounds && bounds.length >= 2) {
-      try {
-        map.fitBounds(bounds, { padding: [padding, padding], maxZoom: 16 });
-      } catch (e) {
-        console.error('FitBounds error:', e);
-      }
+    if (!map) return;
+    
+    const points = [];
+    
+    // Add chauffeur position
+    if (chauffeurPos) {
+      points.push(L.latLng(chauffeurPos[0], chauffeurPos[1]));
     }
-  }, [bounds, map, padding]);
-  return null;
-};
-
-// Map center updater
-const MapUpdater = ({ center, zoom = 15 }) => {
-  const map = useMap();
-  useEffect(() => {
-    if (center) {
-      map.setView(center, zoom);
+    
+    // Add client position if going to pickup
+    if (clientPos && courseStatus !== 'in_progress') {
+      points.push(L.latLng(clientPos[0], clientPos[1]));
     }
-  }, [center, map, zoom]);
+    
+    // Add destination if in progress
+    if (destinationPos && courseStatus === 'in_progress') {
+      points.push(L.latLng(destinationPos[0], destinationPos[1]));
+    }
+    
+    if (points.length >= 2) {
+      const bounds = L.latLngBounds(points);
+      // Fit with good padding like Uber
+      map.fitBounds(bounds, { 
+        padding: [100, 100],
+        maxZoom: 15,
+        animate: true,
+        duration: 0.5
+      });
+      hasInitialized.current = true;
+    } else if (points.length === 1 && !hasInitialized.current) {
+      map.setView(points[0], 15, { animate: true });
+      hasInitialized.current = true;
+    }
+  }, [map, chauffeurPos, clientPos, destinationPos, courseStatus]);
+  
   return null;
 };
 
@@ -133,7 +142,7 @@ const ChauffeurDashboard = () => {
   
   // Route data
   const [routePolyline, setRoutePolyline] = useState([]);
-  const [routeInfo, setRouteInfo] = useState(null); // { distance, duration, eta }
+  const [routeInfo, setRouteInfo] = useState(null);
   
   // Commandes
   const [commandes, setCommandes] = useState([]);
@@ -145,7 +154,7 @@ const ChauffeurDashboard = () => {
   // Calendar
   const [indisponibilites, setIndisponibilites] = useState([]);
   
-  // Audio ref for notifications
+  // Audio ref
   const audioRef = useRef(null);
 
   // Load Google Maps script
@@ -176,7 +185,11 @@ const ChauffeurDashboard = () => {
 
   // Calculate route with Google Directions
   const calculateRoute = useCallback(async (origin, destination) => {
-    if (!window.google || !window.google.maps) return;
+    if (!window.google || !window.google.maps) {
+      // Fallback: create simple straight line
+      setRoutePolyline([[origin.lat, origin.lng], [destination.lat, destination.lng]]);
+      return;
+    }
     
     const directionsService = new window.google.maps.DirectionsService();
     
@@ -206,21 +219,29 @@ const ChauffeurDashboard = () => {
         
         setRouteInfo({
           distance: leg.distance.text,
-          distanceValue: leg.distance.value,
+          distanceValue: leg.distance.value / 1000, // km
           duration: leg.duration.text,
-          durationValue: leg.duration.value,
+          durationValue: leg.duration.value / 60, // minutes
           eta: eta.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
         });
       }
     } catch (error) {
       console.error('Route calculation error:', error);
+      // Fallback to straight line
+      setRoutePolyline([[origin.lat, origin.lng], [destination.lat, destination.lng]]);
     }
   }, []);
 
   // Geolocation tracking
   useEffect(() => {
-    if (!isOnline) return;
+    if (!isOnline) {
+      setPosition(null);
+      return;
+    }
 
+    // Set default position for testing (Paris center)
+    const defaultPos = [48.8566, 2.3522];
+    
     const updatePosition = async (pos) => {
       const newPos = [pos.coords.latitude, pos.coords.longitude];
       setPosition(newPos);
@@ -250,19 +271,28 @@ const ChauffeurDashboard = () => {
       }
     };
 
-    // Get initial position
-    navigator.geolocation.getCurrentPosition(updatePosition, console.error);
-    
-    // Watch position
-    const watchId = navigator.geolocation.watchPosition(
-      updatePosition,
-      (error) => {
-        console.error('Geolocation error:', error);
-      },
-      { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
-    );
-
-    return () => navigator.geolocation.clearWatch(watchId);
+    // Try to get real position
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        updatePosition, 
+        () => {
+          // Fallback to default position
+          setPosition(defaultPos);
+          chauffeurApi.updatePosition({ latitude: defaultPos[0], longitude: defaultPos[1] }).catch(() => {});
+        },
+        { timeout: 5000 }
+      );
+      
+      const watchId = navigator.geolocation.watchPosition(
+        updatePosition,
+        () => {},
+        { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+      );
+      
+      return () => navigator.geolocation.clearWatch(watchId);
+    } else {
+      setPosition(defaultPos);
+    }
   }, [isOnline, currentCourse, calculateRoute]);
 
   // Poll for incoming course requests
@@ -313,7 +343,7 @@ const ChauffeurDashboard = () => {
     return () => clearInterval(interval);
   }, [isOnline, incomingRequest?.id, currentCourse?.status, position, calculateRoute]);
 
-  // Toggle online status (pointer)
+  // Toggle online status
   const handlePointer = async () => {
     setLoading(true);
     try {
@@ -456,20 +486,15 @@ const ChauffeurDashboard = () => {
     navigate('/');
   };
 
-  // Calculate map bounds for route
-  const getMapBounds = () => {
-    if (!currentCourse || !position) return null;
-    
-    const bounds = [position];
-    
-    if (currentCourse.status === 'assigned' || currentCourse.status === 'in_progress') {
-      bounds.push([currentCourse.pickup_lat, currentCourse.pickup_lng]);
-    }
-    if (currentCourse.status === 'in_progress') {
-      bounds.push([currentCourse.destination_lat, currentCourse.destination_lng]);
-    }
-    
-    return bounds.length >= 2 ? bounds : null;
+  // Get positions for map controller
+  const getClientPos = () => {
+    if (!currentCourse) return null;
+    return [currentCourse.pickup_lat, currentCourse.pickup_lng];
+  };
+
+  const getDestPos = () => {
+    if (!currentCourse || currentCourse.status !== 'in_progress') return null;
+    return [currentCourse.destination_lat, currentCourse.destination_lng];
   };
 
   return (
@@ -503,7 +528,6 @@ const ChauffeurDashboard = () => {
                 variant="ghost" 
                 className={`w-full justify-start text-white hover:text-[#FFD700] hover:bg-white/10 ${view === 'map' ? 'text-[#FFD700]' : ''}`}
                 onClick={() => handleViewChange('map')}
-                data-testid="menu-map-btn"
               >
                 <MapPin className="w-5 h-5 mr-3" />
                 Tableau de bord
@@ -512,7 +536,6 @@ const ChauffeurDashboard = () => {
                 variant="ghost" 
                 className={`w-full justify-start text-white hover:text-[#FFD700] hover:bg-white/10 ${view === 'commandes' ? 'text-[#FFD700]' : ''}`}
                 onClick={() => handleViewChange('commandes')}
-                data-testid="menu-commandes-btn"
               >
                 <Clock className="w-5 h-5 mr-3" />
                 Mes commandes
@@ -521,7 +544,6 @@ const ChauffeurDashboard = () => {
                 variant="ghost" 
                 className={`w-full justify-start text-white hover:text-[#FFD700] hover:bg-white/10 ${view === 'revenus' ? 'text-[#FFD700]' : ''}`}
                 onClick={() => handleViewChange('revenus')}
-                data-testid="menu-revenus-btn"
               >
                 <DollarSign className="w-5 h-5 mr-3" />
                 Mes revenus
@@ -530,7 +552,6 @@ const ChauffeurDashboard = () => {
                 variant="ghost" 
                 className={`w-full justify-start text-white hover:text-[#FFD700] hover:bg-white/10 ${view === 'calendar' ? 'text-[#FFD700]' : ''}`}
                 onClick={() => handleViewChange('calendar')}
-                data-testid="menu-calendar-btn"
               >
                 <Calendar className="w-5 h-5 mr-3" />
                 Calendrier
@@ -540,7 +561,6 @@ const ChauffeurDashboard = () => {
                   variant="ghost" 
                   className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-500/10"
                   onClick={handleLogout}
-                  data-testid="logout-btn"
                 >
                   <LogOut className="w-5 h-5 mr-3" />
                   Déconnexion
@@ -552,7 +572,6 @@ const ChauffeurDashboard = () => {
         
         <img src={LOGO_URL} alt="TaxiG" className="h-10" />
         
-        {/* Online/Offline toggle */}
         <Button
           variant="ghost"
           size="icon"
@@ -580,32 +599,36 @@ const ChauffeurDashboard = () => {
           <>
             <MapContainer 
               center={position || [48.8566, 2.3522]}
-              zoom={15}
+              zoom={14}
               className="w-full h-full z-0"
               zoomControl={false}
+              scrollWheelZoom={true}
+              doubleClickZoom={true}
+              dragging={true}
             >
               <TileLayer
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution='&copy; OpenStreetMap'
               />
               
-              {/* Auto-fit bounds when route exists */}
-              {currentCourse && position && <FitBounds bounds={getMapBounds()} />}
-              {!currentCourse && position && <MapUpdater center={position} />}
+              {/* Smart map controller - centers between chauffeur and client like Uber */}
+              <MapController 
+                chauffeurPos={position}
+                clientPos={getClientPos()}
+                destinationPos={getDestPos()}
+                courseStatus={currentCourse?.status}
+              />
               
               {/* Chauffeur position (yellow car) */}
               {position && (
                 <Marker position={position} icon={chauffeurIcon}>
                   <Popup>
-                    <div className="text-center">
-                      <p className="font-bold">Votre position</p>
-                      {routeInfo && <p className="text-sm text-gray-600">ETA: {routeInfo.eta}</p>}
-                    </div>
+                    <div className="text-center font-bold">🚕 Votre position</div>
                   </Popup>
                 </Marker>
               )}
               
-              {/* Client pickup position (blue pulsing) */}
+              {/* Client pickup position (blue) */}
               {currentCourse && (
                 <Marker 
                   position={[currentCourse.pickup_lat, currentCourse.pickup_lng]} 
@@ -613,14 +636,14 @@ const ChauffeurDashboard = () => {
                 >
                   <Popup>
                     <div className="text-center">
-                      <p className="font-bold text-blue-600">📍 Client: {currentCourse.client_nom}</p>
-                      <p className="text-sm">{currentCourse.pickup_address}</p>
+                      <p className="font-bold text-blue-600">📍 {currentCourse.client_nom}</p>
+                      <p className="text-xs">{currentCourse.pickup_address}</p>
                     </div>
                   </Popup>
                 </Marker>
               )}
               
-              {/* Destination position (green) - only show when in_progress */}
+              {/* Destination position (green) */}
               {currentCourse && currentCourse.status === 'in_progress' && (
                 <Marker 
                   position={[currentCourse.destination_lat, currentCourse.destination_lng]} 
@@ -629,66 +652,66 @@ const ChauffeurDashboard = () => {
                   <Popup>
                     <div className="text-center">
                       <p className="font-bold text-green-600">🏁 Destination</p>
-                      <p className="text-sm">{currentCourse.destination_address}</p>
+                      <p className="text-xs">{currentCourse.destination_address}</p>
                     </div>
                   </Popup>
                 </Marker>
               )}
               
-              {/* Route polyline (blue gradient like Google Maps) */}
+              {/* Route polyline (blue like Google Maps) */}
               {routePolyline.length > 0 && (
                 <>
-                  {/* Shadow line */}
                   <Polyline 
                     positions={routePolyline}
                     color="#1a73e8"
-                    weight={8}
-                    opacity={0.4}
+                    weight={7}
+                    opacity={0.5}
                   />
-                  {/* Main line */}
                   <Polyline 
                     positions={routePolyline}
                     color="#4285f4"
-                    weight={5}
+                    weight={4}
                     opacity={1}
                   />
                 </>
               )}
             </MapContainer>
 
-            {/* Route Info Bar - Only show when there's a route */}
+            {/* Route Info Bar */}
             {currentCourse && routeInfo && (
-              <div className="absolute top-2 left-2 right-2 bg-white rounded-lg shadow-lg p-3 z-10">
+              <div className="absolute top-2 left-2 right-2 bg-white rounded-xl shadow-lg p-4 z-10">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-                      <Route className="w-5 h-5 text-white" />
+                    <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
+                      <Route className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <p className="text-black font-bold text-lg">{routeInfo.duration}</p>
-                      <p className="text-gray-600 text-sm">{routeInfo.distance}</p>
+                      <p className="text-black font-bold text-xl">{routeInfo.duration}</p>
+                      <p className="text-gray-500 text-sm">{routeInfo.distance}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-gray-500 text-sm">Arrivée estimée</p>
-                    <p className="text-black font-bold text-xl">{routeInfo.eta}</p>
+                    <p className="text-gray-400 text-xs uppercase">Arrivée</p>
+                    <p className="text-black font-bold text-2xl">{routeInfo.eta}</p>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Current Course Panel */}
+            {/* Course Panel */}
             {currentCourse && (
               <div className="absolute bottom-0 left-0 right-0 bg-[#18181B] rounded-t-3xl p-6 z-10 shadow-2xl border-t border-zinc-700">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <p className="text-zinc-400 text-sm">
-                      {currentCourse.status === 'assigned' ? '🚗 En route vers le client' : '🏁 En course vers destination'}
+                      {currentCourse.status === 'assigned' ? '🚗 En route vers le client' : '🏁 En course'}
                     </p>
                     <p className="text-white font-bold">{currentCourse.commande_no}</p>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                    currentCourse.status === 'in_progress' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                    currentCourse.status === 'in_progress' 
+                      ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                      : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                   }`}>
                     {currentCourse.status === 'in_progress' ? 'En course' : 'Client en attente'}
                   </span>
@@ -704,19 +727,19 @@ const ChauffeurDashboard = () => {
                     </div>
                     <div className="flex-1 space-y-4">
                       <div>
-                        <p className="text-zinc-400 text-xs">PRISE EN CHARGE</p>
-                        <p className="text-white text-sm font-medium">{currentCourse.pickup_address}</p>
+                        <p className="text-zinc-500 text-xs">PRISE EN CHARGE</p>
+                        <p className="text-white text-sm">{currentCourse.pickup_address}</p>
                         <p className="text-blue-400 text-xs font-bold">👤 {currentCourse.client_nom}</p>
                       </div>
                       <div>
-                        <p className="text-zinc-400 text-xs">DESTINATION</p>
-                        <p className="text-white text-sm font-medium">{currentCourse.destination_address}</p>
+                        <p className="text-zinc-500 text-xs">DESTINATION</p>
+                        <p className="text-white text-sm">{currentCourse.destination_address}</p>
                       </div>
                     </div>
                   </div>
                 </div>
                 
-                {/* Live route info */}
+                {/* Route info */}
                 {routeInfo && (
                   <div className="flex justify-between items-center mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                     <div className="flex items-center gap-2">
@@ -733,9 +756,9 @@ const ChauffeurDashboard = () => {
                   </div>
                 )}
                 
-                <div className="flex justify-between items-center mb-4 text-sm text-zinc-400">
-                  <span>{currentCourse.distance_km?.toFixed(1)} km total</span>
-                  <span className="text-[#FFD700] font-bold text-lg">{currentCourse.prix_estime?.toFixed(2)}€</span>
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-zinc-400">{currentCourse.distance_km?.toFixed(1)} km</span>
+                  <span className="text-[#FFD700] font-bold text-xl">{currentCourse.prix_estime?.toFixed(2)}€</span>
                 </div>
                 
                 {currentCourse.status === 'assigned' ? (
@@ -745,7 +768,7 @@ const ChauffeurDashboard = () => {
                     data-testid="start-course-btn"
                   >
                     <Navigation className="w-6 h-6 mr-2" />
-                    Client récupéré - Démarrer la course
+                    Client récupéré - Démarrer
                   </Button>
                 ) : (
                   <Button 
@@ -754,26 +777,25 @@ const ChauffeurDashboard = () => {
                     data-testid="complete-course-btn"
                   >
                     <CheckCircle className="w-6 h-6 mr-2" />
-                    Arrivé - Terminer la course
+                    Terminer la course
                   </Button>
                 )}
               </div>
             )}
 
-            {/* No active course message */}
+            {/* Waiting message */}
             {!currentCourse && isOnline && (
-              <div className="absolute bottom-0 left-0 right-0 bg-[#18181B] rounded-t-3xl p-6 z-10 shadow-2xl border-t border-zinc-700">
+              <div className="absolute bottom-0 left-0 right-0 bg-[#18181B] rounded-t-3xl p-6 z-10">
                 <div className="text-center py-4">
                   <MapPin className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
                   <p className="text-zinc-400">En attente d'une course...</p>
-                  <p className="text-zinc-500 text-sm mt-1">Les demandes apparaîtront ici</p>
                 </div>
               </div>
             )}
 
             {/* Offline message */}
             {!isOnline && (
-              <div className="absolute bottom-0 left-0 right-0 bg-[#18181B] rounded-t-3xl p-6 z-10 shadow-2xl border-t border-zinc-700">
+              <div className="absolute bottom-0 left-0 right-0 bg-[#18181B] rounded-t-3xl p-6 z-10">
                 <div className="text-center py-4">
                   <Power className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
                   <p className="text-zinc-400">Vous êtes hors service</p>
@@ -796,15 +818,15 @@ const ChauffeurDashboard = () => {
           <div className="p-6 overflow-y-auto h-full">
             <h2 className="text-2xl font-bold text-white mb-6">Mes commandes</h2>
             
-            <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-              {['all', 'completed', 'assigned', 'in_progress'].map((filter) => (
+            <div className="flex gap-2 mb-6 flex-wrap">
+              {['all', 'completed', 'assigned'].map((filter) => (
                 <Button
                   key={filter}
                   variant={commandeFilter === filter ? 'default' : 'outline'}
                   className={commandeFilter === filter ? 'btn-taxi' : 'border-zinc-700 text-white'}
                   onClick={() => { setCommandeFilter(filter); fetchCommandes(); }}
                 >
-                  {filter === 'all' ? 'Toutes' : filter === 'completed' ? 'Terminées' : filter === 'assigned' ? 'Assignées' : 'En cours'}
+                  {filter === 'all' ? 'Toutes' : filter === 'completed' ? 'Terminées' : 'Assignées'}
                 </Button>
               ))}
             </div>
@@ -826,19 +848,16 @@ const ChauffeurDashboard = () => {
             ) : (
               <div className="space-y-4">
                 {commandes.map((commande) => (
-                  <div key={commande.id} className="card-taxi p-4" data-testid={`commande-${commande.id}`}>
+                  <div key={commande.id} className="card-taxi p-4">
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <p className="text-white font-bold">{commande.commande_no}</p>
                         <p className="text-zinc-400 text-sm">{commande.client_nom}</p>
                       </div>
                       <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                        commande.status === 'completed' ? 'badge-success' :
-                        commande.status === 'assigned' ? 'badge-info' :
-                        'badge-warning'
+                        commande.status === 'completed' ? 'badge-success' : 'badge-info'
                       }`}>
-                        {commande.status === 'completed' ? 'Terminée' :
-                         commande.status === 'assigned' ? 'Assignée' : 'En cours'}
+                        {commande.status === 'completed' ? 'Terminée' : 'Assignée'}
                       </span>
                     </div>
                     <div className="flex justify-between items-center mt-3 pt-3 border-t border-zinc-700">
@@ -859,54 +878,33 @@ const ChauffeurDashboard = () => {
           <div className="p-6 overflow-y-auto h-full">
             <h2 className="text-2xl font-bold text-white mb-6">Mes revenus</h2>
             
-            {loading ? (
-              <div className="space-y-4">
-                {[1,2,3].map(i => (
-                  <div key={i} className="card-taxi p-4 animate-pulse">
-                    <div className="h-8 bg-zinc-700 rounded w-1/2" />
-                  </div>
-                ))}
+            {!revenus ? (
+              <div className="text-center py-12">
+                <DollarSign className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
+                <Button className="btn-taxi" onClick={fetchRevenus}>Charger les revenus</Button>
               </div>
-            ) : revenus ? (
+            ) : (
               <div className="space-y-6">
                 <div className="card-taxi p-6 border-[#FFD700]/30">
-                  <p className="text-zinc-400 text-sm mb-1">Revenus brut (30 jours)</p>
+                  <p className="text-zinc-400 text-sm">Revenus brut (30 jours)</p>
                   <p className="text-[#FFD700] text-4xl font-black">{revenus.revenus_brut_30j?.toFixed(2)}€</p>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="card-taxi p-4">
-                    <p className="text-zinc-400 text-sm">Revenus net</p>
+                    <p className="text-zinc-400 text-sm">Net</p>
                     <p className="text-white text-2xl font-bold">{revenus.revenus_net_30j?.toFixed(2)}€</p>
                   </div>
                   <div className="card-taxi p-4">
-                    <p className="text-zinc-400 text-sm">Commission due</p>
+                    <p className="text-zinc-400 text-sm">Commission</p>
                     <p className="text-red-400 text-2xl font-bold">{revenus.commission_due?.toFixed(2)}€</p>
                   </div>
                 </div>
                 
                 <div className="card-taxi p-4">
-                  <p className="text-zinc-400 text-sm">Courses effectuées</p>
+                  <p className="text-zinc-400 text-sm">Courses</p>
                   <p className="text-white text-2xl font-bold">{revenus.nombre_courses_30j}</p>
                 </div>
-                
-                <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-amber-400 mt-0.5" />
-                    <div>
-                      <p className="text-amber-400 font-bold">Commission à régler</p>
-                      <p className="text-zinc-400 text-sm">
-                        Payez avant le 15 du mois pour éviter des frais supplémentaires.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <DollarSign className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
-                <p className="text-zinc-400">Données non disponibles</p>
-                <Button className="btn-taxi mt-4" onClick={fetchRevenus}>Charger</Button>
               </div>
             )}
           </div>
@@ -916,43 +914,27 @@ const ChauffeurDashboard = () => {
         {view === 'calendar' && (
           <div className="p-6 overflow-y-auto h-full">
             <h2 className="text-2xl font-bold text-white mb-2">Calendrier</h2>
-            <p className="text-zinc-400 mb-6">Indiquez vos jours d'indisponibilité</p>
+            <p className="text-zinc-400 mb-6">Indiquez vos indisponibilités</p>
             
             <div className="card-taxi p-4 flex justify-center">
               <CalendarComponent
                 mode="multiple"
                 selected={indisponibilites.map(d => new Date(d))}
                 onSelect={(dates) => {
-                  if (dates && dates.length > 0) {
-                    const lastDate = dates[dates.length - 1];
-                    handleDateSelect(lastDate);
+                  if (dates?.length > 0) {
+                    handleDateSelect(dates[dates.length - 1]);
                   }
                 }}
                 className="bg-transparent"
-                classNames={{
-                  day_selected: "bg-red-500 text-white hover:bg-red-600",
-                  day_today: "bg-[#FFD700]/20 text-[#FFD700]"
-                }}
               />
-            </div>
-            
-            <div className="mt-6 flex items-center gap-4 justify-center text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-red-500 rounded" />
-                <span className="text-zinc-400">Indisponible</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-[#FFD700]/20 rounded border border-[#FFD700]" />
-                <span className="text-zinc-400">Aujourd'hui</span>
-              </div>
             </div>
           </div>
         )}
       </main>
 
-      {/* Incoming Course Request Dialog */}
+      {/* Incoming Course Dialog */}
       <Dialog open={showIncomingDialog} onOpenChange={setShowIncomingDialog}>
-        <DialogContent className="bg-[#18181B] border-zinc-700 max-w-sm mx-4 incoming-call-animation">
+        <DialogContent className="bg-[#18181B] border-zinc-700 max-w-sm mx-4">
           <DialogHeader>
             <DialogTitle className="text-white text-center text-2xl">🚕 Nouvelle course !</DialogTitle>
             <DialogDescription className="text-zinc-400 text-center">
@@ -979,26 +961,26 @@ const ChauffeurDashboard = () => {
               </div>
               
               <p className="text-zinc-400 text-center text-sm mb-6">
-                👤 Client: <span className="text-white font-bold">{incomingRequest.client_nom}</span>
+                👤 <span className="text-white font-bold">{incomingRequest.client_nom}</span>
               </p>
               
               <div className="flex gap-4">
                 <Button
-                  className="flex-1 h-16 bg-red-500 hover:bg-red-600 text-white font-bold text-lg"
+                  className="flex-1 h-14 bg-red-500 hover:bg-red-600 text-white font-bold"
                   onClick={() => handleRespondToCourse(false)}
                   disabled={loading}
                   data-testid="reject-course-btn"
                 >
-                  <XCircle className="w-7 h-7 mr-2" />
+                  <XCircle className="w-6 h-6 mr-2" />
                   Refuser
                 </Button>
                 <Button
-                  className="flex-1 h-16 bg-green-500 hover:bg-green-600 text-white font-bold text-lg"
+                  className="flex-1 h-14 bg-green-500 hover:bg-green-600 text-white font-bold"
                   onClick={() => handleRespondToCourse(true)}
                   disabled={loading}
                   data-testid="accept-course-btn"
                 >
-                  <CheckCircle className="w-7 h-7 mr-2" />
+                  <CheckCircle className="w-6 h-6 mr-2" />
                   Accepter
                 </Button>
               </div>
