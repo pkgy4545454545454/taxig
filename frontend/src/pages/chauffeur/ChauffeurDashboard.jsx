@@ -580,12 +580,16 @@ const ChauffeurDashboard = () => {
     }
   };
 
-  // Fetch revenus
+  // Fetch revenus with course details for PDF
   const fetchRevenus = async () => {
     setLoading(true);
     try {
-      const response = await chauffeurApi.getRevenus();
-      setRevenus(response.data);
+      const [revenusResponse, commandesResponse] = await Promise.all([
+        chauffeurApi.getRevenus(),
+        chauffeurApi.getCommandes('completed')
+      ]);
+      setRevenus(revenusResponse.data);
+      setRevenusDetails(commandesResponse.data || []);
     } catch (error) {
       toast.error('Erreur lors du chargement');
     } finally {
