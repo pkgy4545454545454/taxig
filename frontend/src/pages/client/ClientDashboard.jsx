@@ -225,9 +225,15 @@ const ClientDashboard = () => {
       return;
     }
     
-    // Calculate estimate
-    const distance = calculateDistance(pickup.lat, pickup.lng, destination.lat, destination.lng);
-    const duration = distance * 2.5; // Rough estimate: 2.5 min per km
+    // Calculate real route with Google Maps
+    let routeData = null;
+    if (googleLoaded) {
+      routeData = await calculateRoute();
+    }
+    
+    // Fallback to haversine if Google fails
+    const distance = routeData?.distance_km || calculateDistance(pickup.lat, pickup.lng, destination.lat, destination.lng);
+    const duration = routeData?.duration_minutes || distance * 2.5;
     
     try {
       const response = await courseApi.estimate({
