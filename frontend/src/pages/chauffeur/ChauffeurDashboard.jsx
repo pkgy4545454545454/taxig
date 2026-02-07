@@ -343,15 +343,16 @@ const ChauffeurDashboard = () => {
             setIncomingRequest(null);
             setShowIncomingDialog(false);
             
-            // Calculate initial route
-            if (position) {
-              const targetLat = course.status === 'in_progress' ? course.destination_lat : course.pickup_lat;
-              const targetLng = course.status === 'in_progress' ? course.destination_lng : course.pickup_lng;
-              calculateRoute(
-                { lat: position[0], lng: position[1] },
-                { lat: targetLat, lng: targetLng }
-              );
-            }
+            // Calculate initial route - use default position if not available
+            const currentPos = position || [48.8566, 2.3522]; // Default to Paris
+            const targetLat = course.status === 'in_progress' ? course.destination_lat : course.pickup_lat;
+            const targetLng = course.status === 'in_progress' ? course.destination_lng : course.pickup_lng;
+            
+            console.log('Course assigned, calculating route...');
+            calculateRoute(
+              { lat: currentPos[0], lng: currentPos[1] },
+              { lat: targetLat, lng: targetLng }
+            );
           }
         } else {
           if (currentCourse?.status === 'completed') {
