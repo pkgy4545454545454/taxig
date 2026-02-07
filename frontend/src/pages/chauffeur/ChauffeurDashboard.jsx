@@ -215,7 +215,7 @@ const ChauffeurDashboard = () => {
       ['Nombre de courses', `${revenus.nombre_courses_30j || 0}`],
     ];
     
-    doc.autoTable({
+    autoTable(doc, {
       startY: 108,
       head: [['Description', 'Montant']],
       body: summaryData,
