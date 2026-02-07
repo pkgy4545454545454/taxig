@@ -557,9 +557,13 @@ const ClientDashboard = () => {
           <>
             <MapContainer 
               center={mapCenter} 
-              zoom={14} 
+              zoom={16} 
               className="w-full h-full z-0"
               zoomControl={false}
+              scrollWheelZoom={false}
+              doubleClickZoom={true}
+              touchZoom={true}
+              dragging={true}
             >
               {/* CARTE EN COULEUR - OpenStreetMap standard */}
               <TileLayer
