@@ -128,7 +128,7 @@ const ClientCourse = () => {
       case 'in_progress':
         return { text: 'Course en cours', color: 'text-green-400', icon: MapPin };
       case 'completed':
-        return { text: 'Course terminée', color: 'text-green-400', icon: CheckCircle2 };
+        return { text: 'Vous êtes arrivé !', color: 'text-green-400', icon: CheckCircle2 };
       case 'cancelled':
         return { text: 'Course annulée', color: 'text-red-400', icon: XCircle };
       default:
