@@ -5,7 +5,7 @@ Application de taxi style Uber avec 3 parties : Client, Chauffeur, Admin. Géolo
 
 ## Architecture
 - **Backend**: FastAPI + MongoDB (cloud cluster)
-- **Frontend**: React + Leaflet Maps
+- **Frontend**: React + Leaflet Maps + Google Maps API
 - **Auth**: JWT tokens
 - **Payments**: Stripe integration
 
@@ -29,11 +29,19 @@ Application de taxi style Uber avec 3 parties : Client, Chauffeur, Admin. Géolo
 
 ### Frontend
 - [x] Landing page avec logo TaxiG
-- [x] Dashboard Client avec carte Leaflet
+- [x] Dashboard Client avec carte Leaflet couleur
 - [x] Google Maps Autocomplete pour destinations
 - [x] Dashboard Chauffeur avec appel entrant style téléphone
 - [x] Dashboard Admin complet avec stats
 - [x] Design noir/jaune professionnel
+- [x] **CORRIGÉ** Calcul distance avec Google Directions API
+- [x] **CORRIGÉ** Centrage carte style Uber (fitBounds)
+- [x] **CORRIGÉ** Itinéraire coloré visible sur carte chauffeur
+
+## Bug Fixes (7 Feb 2026)
+- ✅ **Bug 1**: Calcul prix incorrect - Corrigé dans `handleDestinationSet()` pour utiliser Google Directions API
+- ✅ **Bug 2**: Zoom/centrage horrible - Corrigé `MapController` avec `fitBounds()` dynamique
+- ✅ **Bug 3**: Itinéraire non visible - Corrigé `decodePolyline()` pour extraire `.points`
 
 ## Collections MongoDB
 - clients, client_commandes
@@ -49,9 +57,16 @@ Application de taxi style Uber avec 3 parties : Client, Chauffeur, Admin. Géolo
 - Google Maps API: Autocomplete, Directions, Geocoding
 - Stripe: Paiements carte
 
+## Test Credentials
+- **Client**: jean.dupont@test.com / test123
+- **Chauffeur**: TAXI001 / chauffeur123
+- **Admin**: naim / admin123
+
 ## Next Tasks (P0/P1)
 - P0: Test complet flow paiement Stripe
-- P1: Notifications push navigateur
+- P1: Notifications push navigateur pour chauffeurs
 - P1: Historique rapports chauffeurs
 - P2: Export CSV revenus admin
 - P2: Mode sombre/clair toggle
+- P2: Système notation 5 étoiles
+- P3: Upload documents chauffeur (permis)
