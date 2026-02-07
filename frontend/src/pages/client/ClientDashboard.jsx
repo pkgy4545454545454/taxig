@@ -535,7 +535,7 @@ const ClientDashboard = () => {
           <>
             <MapContainer 
               center={mapCenter} 
-              zoom={17} 
+              zoom={18} 
               className="w-full h-full z-0"
               zoomControl={false}
               scrollWheelZoom={false}
@@ -548,7 +548,7 @@ const ClientDashboard = () => {
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               />
-              <MapUpdater center={mapCenter} />
+              <MapUpdater center={mapCenter} zoom={18} />
               
               {/* User position */}
               {userPosition && (
