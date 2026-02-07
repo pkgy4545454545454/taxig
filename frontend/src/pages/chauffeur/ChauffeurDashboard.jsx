@@ -369,9 +369,7 @@ const ChauffeurDashboard = () => {
       return;
     }
 
-    // Set default position for testing (Paris center)
-    const defaultPos = [48.8566, 2.3522];
-    
+    // Pas de position par défaut - utiliser uniquement la vraie géolocalisation
     const updatePosition = async (pos) => {
       const newPos = [pos.coords.latitude, pos.coords.longitude];
       setPosition(newPos);
@@ -401,27 +399,28 @@ const ChauffeurDashboard = () => {
       }
     };
 
-    // Try to get real position
+    // Utiliser uniquement la vraie géolocalisation
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         updatePosition, 
-        () => {
-          // Fallback to default position
-          setPosition(defaultPos);
-          chauffeurApi.updatePosition({ latitude: defaultPos[0], longitude: defaultPos[1] }).catch(() => {});
+        (error) => {
+          console.error('Geolocation error:', error);
+          toast.error('Activez la géolocalisation pour utiliser l\'application');
         },
-        { timeout: 5000 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
       
       const watchId = navigator.geolocation.watchPosition(
         updatePosition,
-        () => {},
-        { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+        (error) => {
+          console.error('Watch position error:', error);
+        },
+        { enableHighAccuracy: true, maximumAge: 2000, timeout: 15000 }
       );
       
       return () => navigator.geolocation.clearWatch(watchId);
     } else {
-      setPosition(defaultPos);
+      toast.error('Géolocalisation non supportée');
     }
   }, [isOnline, currentCourse, calculateRoute]);
 
