@@ -797,7 +797,8 @@ const ChauffeurDashboard = () => {
               )}
               
               {/* Route polyline (blue like Google Maps) */}
-              {routePolyline.length > 0 && (
+              {/* Route - afficher SEULEMENT avec une vraie course et vraie position */}
+              {currentCourse && position && routePolyline.length > 1 && (
                 <>
                   <Polyline 
                     positions={routePolyline}
