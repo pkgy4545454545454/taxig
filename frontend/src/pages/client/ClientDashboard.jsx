@@ -213,10 +213,24 @@ const ClientDashboard = () => {
         },
         (error) => {
           console.error('Geolocation error:', error);
-          toast.error('Impossible d\'obtenir votre position');
-        }
+          // Set default position when geolocation fails
+          setDefaultPickup();
+        },
+        { timeout: 5000 }
       );
+    } else {
+      // No geolocation support, use default
+      setDefaultPickup();
     }
+    
+    // Set default after 3 seconds if still no position
+    const timeout = setTimeout(() => {
+      if (!pickup.lat) {
+        setDefaultPickup();
+      }
+    }, 3000);
+    
+    return () => clearTimeout(timeout);
   }, []);
 
   // Fetch active chauffeurs
