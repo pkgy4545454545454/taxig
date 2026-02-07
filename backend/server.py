@@ -728,7 +728,10 @@ async def remove_indisponibilite(date: str, user=Depends(get_current_user)):
 # ========== COURSE BOOKING ==========
 
 async def find_closest_chauffeur(lat: float, lng: float, excluded_ids: List[str] = None):
-    query = {"is_online": True, "position": {"$ne": None}}
+    query = {
+        "$or": [{"is_online": True}, {"status": "online"}],
+        "position": {"$ne": None}
+    }
     if excluded_ids:
         query["id"] = {"$nin": excluded_ids}
     
@@ -739,15 +742,23 @@ async def find_closest_chauffeur(lat: float, lng: float, excluded_ids: List[str]
     
     # Calculate distances
     for c in chauffeurs:
-        if c.get("position"):
-            c["distance"] = calculate_distance(lat, lng, c["position"]["lat"], c["position"]["lng"])
+        pos = c.get("position", {})
+        if pos and pos.get("lat") and pos.get("lng"):
+            c["distance"] = calculate_distance(lat, lng, pos["lat"], pos["lng"])
         else:
             c["distance"] = float('inf')
     
     # Sort by distance
     chauffeurs.sort(key=lambda x: x["distance"])
     
-    return chauffeurs[0] if chauffeurs else None
+    # Return first chauffeur with valid id
+    for ch in chauffeurs:
+        ch_id = ch.get("id") or ch.get("code_chauffeur")
+        if ch_id:
+            ch["id"] = ch_id  # Ensure id field exists
+            return ch
+    
+    return None
 
 @api_router.post("/course/estimate", response_model=CourseEstimate)
 async def estimate_course(request: CourseRequest, user=Depends(get_current_user)):
