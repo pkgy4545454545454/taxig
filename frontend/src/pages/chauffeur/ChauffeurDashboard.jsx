@@ -131,11 +131,46 @@ const ChauffeurDashboard = () => {
   // Calendar
   const [indisponibilites, setIndisponibilites] = useState([]);
   
-  // Map following mode - like Google Maps navigation
-  const [isFollowing, setIsFollowing] = useState(true);
+  // Timer temps réel pour la course
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [courseStartTime, setCourseStartTime] = useState(null);
+  const [remainingTime, setRemainingTime] = useState(null);
   
   // Audio ref
   const audioRef = useRef(null);
+  
+  // Timer en temps réel - mise à jour chaque seconde
+  useEffect(() => {
+    if (!currentCourse || !courseStartTime) {
+      setElapsedTime(0);
+      return;
+    }
+    
+    const timer = setInterval(() => {
+      const now = Date.now();
+      const elapsed = Math.floor((now - courseStartTime) / 1000);
+      setElapsedTime(elapsed);
+      
+      // Calculer temps restant estimé
+      if (routeInfo?.durationValue) {
+        const remainingSecs = Math.max(0, (routeInfo.durationValue * 60) - elapsed);
+        setRemainingTime(remainingSecs);
+      }
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [currentCourse, courseStartTime, routeInfo?.durationValue]);
+  
+  // Formater le temps en HH:MM:SS
+  const formatTime = (seconds) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hrs > 0) {
+      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
   
   // PDF Export function for accounting
   const exportRevenusPDF = useCallback(() => {
