@@ -1,100 +1,168 @@
 {
-  "project_name": "TaxiG",
+  "project_name": "TaxiG - EasyJet Style Redesign",
+  "version": "2.0.0",
   "design_philosophy": {
-    "archetype": "The Performance Pro",
-    "core_principles": [
-      "Speed & Clarity: Information must be digestible in milliseconds (for drivers)",
-      "High Contrast: Black, White, and Electric Yellow for maximum outdoor visibility",
-      "Fluid Motion: The map is the hero; UI floats above it like a HUD",
-      "Tactile Feedback: Buttons should feel 'pressable' with clear active states"
-    ],
-    "emotional_tone": "Reliable, Urban, Efficient, Modern"
+    "core_concept": "The 'EasyJet' of Taxi - Efficient, Modern, High-Visibility",
+    "emotional_tone": "Professional, Reliable, Kinetic, Trustworthy",
+    "visual_style": "Swiss Modernism meets Service Utility. High contrast, bold typography, geometric layouts.",
+    "theme_strategy": "Navy Blue Dominance with Electric Orange Action. Clean white spaces for readability."
   },
   "typography": {
-    "font_family_heading": "Chivo, sans-serif",
-    "font_family_body": "Public Sans, sans-serif",
-    "instructions": "Use Chivo for all Headings (h1-h4). It has a strong, automotive character. Use Public Sans for body text, inputs, and data to ensure maximum legibility.",
+    "font_family": {
+      "headings": "Chivo, sans-serif",
+      "body": "Public Sans, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
     "scale": {
-      "h1": "text-4xl md:text-5xl font-black tracking-tight",
-      "h2": "text-3xl md:text-4xl font-bold tracking-tight",
-      "h3": "text-2xl font-bold",
+      "display": "text-6xl md:text-8xl font-black tracking-tight leading-none",
+      "h1": "text-4xl md:text-5xl font-bold tracking-tight",
+      "h2": "text-3xl font-bold tracking-tight",
+      "h3": "text-2xl font-semibold tracking-normal",
+      "body_lg": "text-lg leading-relaxed",
       "body": "text-base leading-relaxed",
-      "small": "text-sm font-medium tracking-wide",
-      "tiny": "text-xs font-bold uppercase tracking-widest"
-    }
+      "caption": "text-sm font-medium tracking-wide uppercase text-muted-foreground"
+    },
+    "usage_rules": [
+      "Headings must utilize Chivo Black (900) or Bold (700) for impact.",
+      "Never use Inter for headings.",
+      "Use ALL CAPS for labels and small navigational elements to mimic airport signage.",
+      "Ensure line-height is tight (leading-none) for display text."
+    ]
   },
   "colors": {
-    "primary": {
-      "name": "Taxi Yellow",
-      "hex": "#FFD700",
-      "usage": "Primary Actions (Book Ride, Accept), Active States, Highlights"
+    "palette": {
+      "brand": {
+        "orange": "#FF6600",
+        "orange_hover": "#E65C00",
+        "navy": "#001F3F",
+        "navy_light": "#1E3A5F"
+      },
+      "neutral": {
+        "white": "#FFFFFF",
+        "slate_50": "#F8FAFC",
+        "slate_100": "#F1F5F9",
+        "slate_200": "#E2E8F0",
+        "slate_800": "#1E293B",
+        "slate_900": "#0F172A",
+        "black": "#020617"
+      },
+      "semantic": {
+        "success": "#10B981",
+        "warning": "#F59E0B",
+        "error": "#EF4444",
+        "info": "#3B82F6"
+      }
     },
-    "secondary": {
-      "name": "Asphalt Black",
-      "hex": "#09090B",
-      "usage": "Backgrounds, Text (on Light), Borders (on Light)"
+    "usage_mapping": {
+      "primary": "var(--brand-orange)",
+      "primary_foreground": "var(--brand-navy)",
+      "secondary": "var(--brand-navy)",
+      "secondary_foreground": "#FFFFFF",
+      "accent": "var(--brand-orange)",
+      "background": "#FFFFFF",
+      "foreground": "var(--brand-navy)",
+      "muted": "#F1F5F9",
+      "muted_foreground": "#64748B",
+      "border": "#E2E8F0"
     },
-    "background": {
-      "light": "#FFFFFF",
-      "dark": "#09090B",
-      "surface_light": "#F4F4F5",
-      "surface_dark": "#18181B"
-    },
-    "text": {
-      "primary_light": "#09090B",
-      "secondary_light": "#52525B",
-      "primary_dark": "#FFFFFF",
-      "secondary_dark": "#A1A1AA"
-    },
-    "status": {
-      "success": "#22C55E",
-      "error": "#EF4444",
-      "warning": "#F59E0B"
+    "gradients": {
+      "hero_overlay": "linear-gradient(135deg, rgba(0,31,63,0.95) 0%, rgba(30,58,95,0.8) 100%)",
+      "orange_shine": "linear-gradient(45deg, #FF6600 0%, #FF8533 100%)"
     }
   },
-  "ui_components": {
+  "components": {
     "buttons": {
-      "primary": "bg-[#FFD700] text-black hover:bg-[#FACC15] font-bold rounded-none uppercase tracking-wider shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all",
-      "secondary": "bg-white border-2 border-black text-black hover:bg-gray-100 font-bold rounded-none shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none",
-      "ghost": "bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground font-medium"
+      "primary": "bg-[#FF6600] hover:bg-[#E65C00] text-[#001F3F] font-black uppercase tracking-wider rounded-none skew-x-[-10deg] px-8 py-4 transition-all hover:skew-x-[-10deg] hover:scale-105 shadow-[4px_4px_0px_0px_#001F3F]",
+      "secondary": "bg-transparent border-2 border-[#001F3F] text-[#001F3F] hover:bg-[#001F3F] hover:text-white font-bold uppercase tracking-wider rounded-none px-6 py-3 transition-all",
+      "ghost": "hover:bg-slate-100 text-slate-700 font-medium",
+      "icon": "p-2 rounded-full hover:bg-slate-100"
     },
     "cards": {
-      "style": "bg-background border border-border shadow-sm rounded-lg p-6",
-      "driver_panel": "fixed bottom-0 left-0 right-0 bg-background border-t border-border rounded-t-3xl shadow-xl p-6 z-50 transform transition-transform duration-300 ease-in-out"
+      "default": "bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden hover:shadow-md transition-shadow",
+      "feature": "bg-slate-50 border-none p-8 rounded-2xl hover:bg-white hover:shadow-xl transition-all duration-300 group",
+      "dashboard_widget": "bg-white border border-slate-100 shadow-sm rounded-xl p-6"
     },
     "inputs": {
-      "style": "h-12 bg-background border-2 border-input focus:border-black focus:ring-0 rounded-md font-medium placeholder:text-muted-foreground"
+      "default": "h-12 bg-slate-50 border border-slate-200 focus:border-[#FF6600] focus:ring-1 focus:ring-[#FF6600] rounded-md font-medium text-[#001F3F] placeholder:text-slate-400 transition-all"
+    },
+    "navigation": {
+      "sidebar": "bg-[#001F3F] text-white border-r border-[#1E3A5F]",
+      "sidebar_item": "flex items-center gap-3 px-4 py-3 rounded-md hover:bg-[#1E3A5F] hover:text-[#FF6600] transition-colors font-medium",
+      "sidebar_item_active": "bg-[#FF6600] text-[#001F3F] font-bold shadow-md"
     }
   },
-  "map_integration": {
-    "library": "react-leaflet",
-    "styles": "CartoDB.Voyager (Light) or CartoDB.DarkMatter (Dark) for clean, distraction-free maps.",
-    "car_marker": "Use 'react-leaflet-animated-marker' for smooth car movement. Use a custom SVG icon for the car (yellow/black chevron or top-down car vector).",
-    "tiles_url": {
-      "light": "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-      "dark": "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+  "layout_strategies": {
+    "marketing": {
+      "grid": "Bento Grid (Mode A)",
+      "spacing": "Generous (py-24, gap-12)",
+      "container": "max-w-7xl mx-auto px-6"
+    },
+    "dashboard": {
+      "grid": "High Density Grid (Mode B)",
+      "spacing": "Compact (p-6, gap-6)",
+      "container": "w-full h-screen overflow-hidden flex"
+    }
+  },
+  "motion": {
+    "page_transition": {
+      "initial": { "opacity": 0, "x": 20 },
+      "animate": { "opacity": 1, "x": 0 },
+      "exit": { "opacity": 0, "x": -20 },
+      "transition": { "duration": 0.3, "ease": "easeOut" }
+    },
+    "hover_effects": {
+      "lift": "hover:-translate-y-1 transition-transform duration-200",
+      "glow": "hover:shadow-[0_0_20px_rgba(255,102,0,0.3)] transition-shadow"
     }
   },
   "assets": {
-    "logo": "https://customer-assets.emergentagent.com/job_geolocab-platform/artifacts/6p3uaynm_1000103457-removebg-preview.png",
-    "images": {
-      "driver_hero": "https://images.unsplash.com/photo-1561527960-4d3db0b66f47?auto=format&fit=crop&q=80",
-      "passenger_hero": "https://images.unsplash.com/photo-1604343670513-af01df1260a1?auto=format&fit=crop&q=80",
-      "map_placeholder": "https://images.unsplash.com/photo-1625062295005-a9be70d46c19?auto=format&fit=crop&q=80"
-    },
-    "icons": "Use 'lucide-react' for UI icons (User, MapPin, CreditCard, Menu, X, Check, Bell, Navigation)."
+    "images": [
+      {
+        "category": "hero_bg",
+        "url": "https://images.unsplash.com/photo-1676215133199-70c5cd5796ef?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzl8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjBibGFjayUyMGNhciUyMHNlcnZpY2UlMjBkcml2ZXIlMjBsdXh1cnl8ZW58MHx8fHwxNzcyNzk3NDg1fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Black Mercedes Front View - Use for Hero Background with heavy Navy overlay"
+      },
+      {
+        "category": "driver_professional",
+        "url": "https://images.unsplash.com/photo-1767022705480-1266a3865c03?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzd8MHwxfHNlYXJjaHwxfHx0YXhpJTIwZHJpdmVyJTIwcHJvZmVzc2lvbmFsJTIwY2l0eXNjYXBlfGVufDB8fHx8MTc3Mjc5NzQ2MHww&ixlib=rb-4.1.0&q=85",
+        "description": "Professional Driver in Traffic - Use for 'Become a Driver' section"
+      },
+      {
+        "category": "passenger_happy",
+        "url": "https://images.unsplash.com/photo-1455539002418-a4cd5aa3ec04?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHw0fHxwYXNzZW5nZXIlMjBsb29raW5nJTIwYXQlMjBwaG9uZSUyMGhhcHB5JTIwbW9kZXJuJTIwY2l0eSUyMG5pZ2h0fGVufDB8fHx8MTc3Mjc5NzQ4Nnww&ixlib=rb-4.1.0&q=85",
+        "description": "Passenger with Phone - Use for 'Easy Booking' feature"
+      },
+      {
+        "category": "luxury_interior",
+        "url": "https://images.unsplash.com/photo-1767277974735-a6e70cd71d2f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzl8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjBibGFjayUyMGNhciUyMHNlcnZpY2UlMjBkcml2ZXIlMjBsdXh1cnl8ZW58MHx8fHwxNzcyNzk3NDg1fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Luxury Interior - Use for 'Premium Comfort' feature"
+      }
+    ],
+    "icons": {
+      "library": "lucide-react",
+      "style": "Stroke width 1.5px, Sharp or Rounded based on context"
+    }
   },
-  "animations": {
-    "page_transition": "initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}",
-    "drawer_slide": "initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}",
-    "pulse": "animate-pulse"
-  },
-  "universal_guidelines": [
-    "Do not use gradients for backgrounds; stick to flat, high-contrast colors.",
-    "Ensure all touch targets are at least 44x44px for mobile drivers.",
-    "Use Skeleton loaders instead of spinners for data fetching states.",
-    "Always provide a 'Back' button in sub-views on mobile.",
-    "Map must be full-screen on mobile, with UI overlaid.",
-    "Use data-testid attributes for all interactive elements."
-  ]
+  "instructions_to_main_agent": [
+    "UPDATE /app/frontend/src/index.css root variables to match the new Navy/Orange palette.",
+    "REPLACE all yellow (#FFD700) instances with Brand Orange (#FF6600).",
+    "REPLACE all black (#09090B) backgrounds with Navy Blue (#001F3F) or Slate 950 (#020617).",
+    "UPDATE Button components in /app/frontend/src/components/ui/button.jsx to use the new 'skewed' or 'pill' styles defined in components section.",
+    "ENSURE all text on Orange backgrounds is Navy (#001F3F) for contrast.",
+    "USE 'Chivo' font for all headings.",
+    "IMPLEMENT sidebar navigation for Dashboards using the Navy theme.",
+    "APPLY data-testid to all interactive elements."
+  ],
+  "universal_guidelines": {
+    "do_not_use": [
+      "Gradients for text",
+      "Default Shadcn Card styles without modification",
+      "Inter font for headings"
+    ],
+    "must_use": [
+      "Consistent spacing scales (p-4, p-6, p-8)",
+      "High contrast focus states",
+      "Smooth transitions for all hover states"
+    ]
+  }
 }
