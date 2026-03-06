@@ -1595,7 +1595,7 @@ CORS_ORIGINS="*"
 ### Frontend (.env)
 
 ```bash
-REACT_APP_BACKEND_URL="https://taxig-debug.preview.emergentagent.com"
+REACT_APP_BACKEND_URL="https://taxig-redesign.preview.emergentagent.com"
 REACT_APP_GOOGLE_MAPS_API_KEY="AIzaSy..."
 ```
 
@@ -1638,7 +1638,7 @@ REACT_APP_GOOGLE_MAPS_API_KEY="AIzaSy..."
 - **Application**: TaxiG
 - **Version**: 1.0.0
 - **Date**: Février 2026
-- **URL**: https://taxig-debug.preview.emergentagent.com
+- **URL**: https://taxig-redesign.preview.emergentagent.com
 
 ---
 

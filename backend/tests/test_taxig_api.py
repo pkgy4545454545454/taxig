@@ -8,7 +8,7 @@ import os
 import uuid
 import time
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://taxig-debug.preview.emergentagent.com')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://taxig-redesign.preview.emergentagent.com')
 
 # Test credentials from review request
 CLIENT_EMAIL = "jean.dupont@test.com"

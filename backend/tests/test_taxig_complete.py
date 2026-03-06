@@ -5,7 +5,7 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://taxig-debug.preview.emergentagent.com')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://taxig-redesign.preview.emergentagent.com')
 
 # Test credentials
 CLIENT_EMAIL = "jean.dupont@test.com"
