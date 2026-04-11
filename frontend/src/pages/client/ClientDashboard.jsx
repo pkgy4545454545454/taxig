@@ -157,8 +157,32 @@ const PlacesAutocomplete = ({ onSelect, placeholder }) => {
     { name: "Gare de Genève-Cornavin", lat: 46.2100, lng: 6.1422 },
     { name: "Hôpital Universitaire de Genève (HUG)", lat: 46.1936, lng: 6.1494 },
     { name: "Palexpo Genève", lat: 46.2342, lng: 6.1116 },
-    { name: "Nations Unies, Genève", lat: 46.2268, lng: 6.1409 },
-    { name: "Jet d'Eau, Genève", lat: 46.2074, lng: 6.1555 }
+    { name: "Nations Unies (ONU), Genève", lat: 46.2268, lng: 6.1409 },
+    { name: "Jet d'Eau, Genève", lat: 46.2074, lng: 6.1555 },
+    { name: "Plainpalais, Genève", lat: 46.1983, lng: 6.1397 },
+    { name: "Carouge, Genève", lat: 46.1833, lng: 6.1392 },
+    { name: "Eaux-Vives, Genève", lat: 46.2019, lng: 6.1617 },
+    { name: "Champel, Genève", lat: 46.1892, lng: 6.1531 },
+    { name: "Pâquis, Genève", lat: 46.2125, lng: 6.1478 },
+    { name: "Servette, Genève", lat: 46.2150, lng: 6.1225 },
+    { name: "Jonction, Genève", lat: 46.2003, lng: 6.1278 },
+    { name: "Chêne-Bourg", lat: 46.1978, lng: 6.1883 },
+    { name: "Thônex", lat: 46.1925, lng: 6.1983 },
+    { name: "Meyrin", lat: 46.2339, lng: 6.0797 },
+    { name: "Vernier", lat: 46.2172, lng: 6.0856 },
+    { name: "Lancy", lat: 46.1833, lng: 6.1167 },
+    { name: "Onex", lat: 46.1833, lng: 6.1000 },
+    { name: "Grand-Saconnex", lat: 46.2333, lng: 6.1167 },
+    { name: "Versoix", lat: 46.2833, lng: 6.1667 },
+    { name: "Nyon", lat: 46.3833, lng: 6.2333 },
+    { name: "Annemasse (France)", lat: 46.1933, lng: 6.2361 },
+    { name: "CERN, Meyrin", lat: 46.2344, lng: 6.0456 },
+    { name: "Stade de Genève", lat: 46.1783, lng: 6.1281 },
+    { name: "Centre commercial Balexert", lat: 46.2217, lng: 6.1119 },
+    { name: "Manor Genève", lat: 46.2042, lng: 6.1442 },
+    { name: "Université de Genève", lat: 46.1994, lng: 6.1461 },
+    { name: "Bains des Pâquis", lat: 46.2097, lng: 6.1522 },
+    { name: "Vieille Ville, Genève", lat: 46.2000, lng: 6.1469 }
   ];
 
   return (
@@ -170,40 +194,55 @@ const PlacesAutocomplete = ({ onSelect, placeholder }) => {
         value={inputValue}
         onChange={(e) => {
           setInputValue(e.target.value);
-          setShowSuggestions(e.target.value.length > 0);
+          setShowSuggestions(true);
         }}
         onKeyDown={handleKeyDown}
-        onFocus={() => setShowSuggestions(inputValue.length > 0 || true)}
-        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+        onFocus={() => setShowSuggestions(true)}
+        onBlur={() => setTimeout(() => setShowSuggestions(false), 300)}
         placeholder={placeholder}
         autoComplete="off"
         className="w-full h-14 bg-navy-800/60 backdrop-blur-sm border-2 border-navy-700 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 rounded-xl font-medium placeholder:text-slate-500 text-white pl-12 pr-4 transition-all duration-300"
         data-testid="destination-input"
       />
       
-      {/* Quick suggestions dropdown */}
-      {showSuggestions && !inputValue && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-navy-800/95 backdrop-blur-xl border border-navy-700 rounded-xl shadow-xl z-50 overflow-hidden">
-          <p className="px-4 py-2 text-xs text-slate-400 border-b border-navy-700">Suggestions rapides</p>
-          {quickSuggestions.map((place, index) => (
-            <button
-              key={index}
-              type="button"
-              className="w-full px-4 py-3 text-left text-white hover:bg-orange-500/20 transition-colors flex items-center gap-3"
-              onClick={() => {
-                setInputValue(place.name);
-                setShowSuggestions(false);
-                onSelect({
-                  address: place.name,
-                  lat: place.lat,
-                  lng: place.lng
-                });
-              }}
-            >
-              <MapPin className="w-4 h-4 text-orange-400 flex-shrink-0" />
-              <span>{place.name}</span>
-            </button>
-          ))}
+      {/* Quick suggestions dropdown - positioned above input */}
+      {showSuggestions && (
+        <div className="absolute bottom-full left-0 right-0 mb-2 bg-navy-800/95 backdrop-blur-xl border border-navy-700 rounded-xl shadow-xl z-[100] overflow-hidden">
+          <div className="overflow-y-auto max-h-64">
+            {quickSuggestions
+              .filter(place => 
+                !inputValue || 
+                place.name.toLowerCase().includes(inputValue.toLowerCase())
+              )
+              .map((place, index) => (
+              <button
+                key={index}
+                type="button"
+                className="w-full px-4 py-3 text-left text-white hover:bg-orange-500/20 transition-colors flex items-center gap-3 border-b border-navy-700/30 last:border-0"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setInputValue(place.name);
+                  setShowSuggestions(false);
+                  onSelect({
+                    address: place.name,
+                    lat: place.lat,
+                    lng: place.lng
+                  });
+                }}
+              >
+                <MapPin className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                <span className="text-sm">{place.name}</span>
+              </button>
+            ))}
+            {inputValue && quickSuggestions.filter(p => p.name.toLowerCase().includes(inputValue.toLowerCase())).length === 0 && (
+              <p className="px-4 py-3 text-slate-400 text-sm text-center">
+                Appuyez sur Entrée pour rechercher "{inputValue}"
+              </p>
+            )}
+          </div>
+          <p className="px-4 py-2 text-xs text-slate-400 border-t border-navy-700 bg-navy-800">
+            {inputValue ? `Résultats pour "${inputValue}"` : '30 destinations à Genève'}
+          </p>
         </div>
       )}
       
