@@ -1,72 +1,50 @@
-# TaxiG - Application de Taxi
+# TaxiG - Product Requirements Document
 
-## Problem Statement
-Application de taxi style Uber avec 3 parties : Client, Chauffeur, Admin. Géolocalisation temps réel, tarification dynamique, paiements Stripe/Cash, système de notifications.
-
-## Architecture
-- **Backend**: FastAPI + MongoDB (cloud cluster)
-- **Frontend**: React + Leaflet Maps + Google Maps API
-- **Auth**: JWT tokens
-- **Payments**: Stripe integration
+## Original Problem Statement
+Build a complete taxi application called "TaxiG" with three-sided platform for clients, drivers, and administrator.
 
 ## Core Requirements
-- Géolocalisation temps réel des chauffeurs
-- Tarification: Base 6.30€ + 3.20€/km + 0.50€/min feux + 0.70€/min attente client
-- 3 dashboards: Client, Chauffeur, Admin
-- Système d'appel entrant pour chauffeurs (accepter/refuser)
-- Jeu roulette promo quotidien (1/20 chance)
-- Pointage chauffeurs avec logs temps réel
+- **Client App:** Registration/login, map view, pickup/destination inputs, price estimation, booking, ride tracking, history
+- **Driver App:** Login with code, online/offline status, real-time requests, accept/reject, route map, revenue export PDF
+- **Admin Dashboard:** Platform statistics, driver/client management, ride monitoring
+- **Design:** "Bleu marine + Orange (EasyJet)" visual theme
 
-## Implemented Features (7 Feb 2026)
-### Backend
-- [x] Auth JWT (Client, Chauffeur, Admin)
-- [x] CRUD Chauffeurs via Admin
-- [x] Booking system avec dispatch au chauffeur le plus proche
-- [x] Calcul tarif dynamique
-- [x] Système de pointage
-- [x] Roulette promo
-- [x] Stripe payment integration
-
-### Frontend
-- [x] Landing page avec logo TaxiG
-- [x] Dashboard Client avec carte Leaflet couleur
-- [x] Google Maps Autocomplete pour destinations
-- [x] Dashboard Chauffeur avec appel entrant style téléphone
-- [x] Dashboard Admin complet avec stats
-- [x] Design noir/jaune professionnel
-- [x] **CORRIGÉ** Calcul distance avec Google Directions API
-- [x] **CORRIGÉ** Centrage carte style Uber (fitBounds)
-- [x] **CORRIGÉ** Itinéraire coloré visible sur carte chauffeur
-
-## Bug Fixes (7 Feb 2026)
-- ✅ **Bug 1**: Calcul prix incorrect - Corrigé dans `handleDestinationSet()` pour utiliser Google Directions API
-- ✅ **Bug 2**: Zoom/centrage horrible - Corrigé `MapController` avec `fitBounds()` dynamique
-- ✅ **Bug 3**: Itinéraire non visible - Corrigé `decodePolyline()` pour extraire `.points`
-
-## Collections MongoDB
-- clients, client_commandes
-- chauffeurs, chauffeur_commandes, chauffeur_revenus, chauffeur_rapports
-- admins, pointages, course_requests, payment_transactions
+## Tech Stack
+- Frontend: React + Tailwind CSS + Shadcn/UI + Leaflet (OpenStreetMap)
+- Backend: FastAPI + MongoDB (Motor) + JWT Auth
+- Maps: OpenStreetMap (Nominatim geocoding, OSRM routing) - NO Google Maps
+- Payments: Stripe (currently broken/expired key)
 
 ## User Personas
-1. **Client**: Commande taxi, suit en temps réel, paie cash/carte
-2. **Chauffeur**: Reçoit appels, pointe début/fin service, gère indisponibilités
-3. **Admin**: Gère chauffeurs/clients, voit revenus, envoie rapports
+1. **Client** - Books rides, tracks drivers, views history
+2. **Chauffeur (Driver)** - Goes online, receives ride requests, navigates, earns revenue
+3. **Admin** - Manages platform, views stats, manages drivers/clients
 
-## APIs
-- Google Maps API: Autocomplete, Directions, Geocoding
-- Stripe: Paiements carte
+## What's Been Implemented (Completed)
+- Full 3-dashboard application (Client, Driver, Admin)
+- JWT authentication for all user types
+- OpenStreetMap integration (Nominatim + OSRM + Leaflet)
+- Ride booking flow (estimate, book, assign, accept, start, complete)
+- Driver revenue tracking + PDF export
+- Roulette promo system for clients
+- Driver calendar/availability management
+- Admin stats, driver/client management, course monitoring
+- "Bleu Marine + Orange" theme applied to ALL pages (including ChauffeurDashboard)
+- Fixed driver notification polling (stable 3s interval using useRef)
+- Fixed dual-database bug (taxi vs taxig)
+- Removed Google Maps, PostHog, debug logs
 
-## Test Credentials
-- **Client**: jean.dupont@test.com / test123
-- **Chauffeur**: TAXI001 / chauffeur123
-- **Admin**: naim / admin123
+## Credentials
+- Client: jean.dupont@test.com / test123
+- Driver: TAXI001 / chauffeur123 (Jean Martin)
+- Admin: naim / admin123
 
-## Next Tasks (P0/P1)
-- P0: Test complet flow paiement Stripe
-- P1: Notifications push navigateur pour chauffeurs
-- P1: Historique rapports chauffeurs
-- P2: Export CSV revenus admin
-- P2: Mode sombre/clair toggle
-- P2: Système notation 5 étoiles
-- P3: Upload documents chauffeur (permis)
+## Prioritized Backlog
+### P1 - Next Tasks
+- Stripe payment integration (needs valid API key)
+- Browser push notifications for drivers
+
+### P2 - Future Tasks
+- 5-star rating system (client/driver)
+- Driver document image upload
+- File refactoring (large dashboard components >1000 lines)
