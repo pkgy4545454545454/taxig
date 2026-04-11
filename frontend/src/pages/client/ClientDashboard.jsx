@@ -65,10 +65,13 @@ const MapUpdater = ({ center, zoom = 18 }) => {
 };
 
 // Google Places Autocomplete Input Component
-const PlacesAutocomplete = ({ value, onChange, onSelect, placeholder }) => {
+const PlacesAutocomplete = ({ onSelect, placeholder }) => {
   const inputRef = useRef(null);
   const autocompleteRef = useRef(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   useEffect(() => {
     if (window.google && window.google.maps && window.google.maps.places) {
@@ -87,6 +90,7 @@ const PlacesAutocomplete = ({ value, onChange, onSelect, placeholder }) => {
     script.async = true;
     script.defer = true;
     script.onload = () => setIsLoaded(true);
+    script.onerror = () => setIsLoaded(false);
     document.head.appendChild(script);
   }, []);
 
@@ -96,7 +100,7 @@ const PlacesAutocomplete = ({ value, onChange, onSelect, placeholder }) => {
     try {
       const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
         types: ['geocode', 'establishment'],
-        componentRestrictions: { country: ['fr', 'ch', 'be'] },
+        componentRestrictions: { country: ['fr', 'ch', 'be', 'lu', 'de', 'it'] },
         fields: ['formatted_address', 'geometry', 'name']
       });
 
@@ -104,6 +108,8 @@ const PlacesAutocomplete = ({ value, onChange, onSelect, placeholder }) => {
         const place = autocomplete.getPlace();
         if (place.geometry) {
           const address = place.formatted_address || place.name;
+          setInputValue(address);
+          setShowSuggestions(false);
           onSelect({
             address: address,
             lat: place.geometry.location.lat(),
@@ -114,9 +120,46 @@ const PlacesAutocomplete = ({ value, onChange, onSelect, placeholder }) => {
 
       autocompleteRef.current = autocomplete;
     } catch (error) {
-      console.error('Google Places error:', error);
+      // Silent fail
     }
   }, [isLoaded, onSelect]);
+
+  // Fallback: Manual geocoding search when user presses Enter
+  const handleKeyDown = async (e) => {
+    if (e.key === 'Enter' && inputValue.trim()) {
+      e.preventDefault();
+      setShowSuggestions(false);
+      
+      if (window.google && window.google.maps) {
+        try {
+          const geocoder = new window.google.maps.Geocoder();
+          geocoder.geocode({ address: inputValue }, (results, status) => {
+            if (status === 'OK' && results[0]) {
+              const place = results[0];
+              onSelect({
+                address: place.formatted_address,
+                lat: place.geometry.location.lat(),
+                lng: place.geometry.location.lng()
+              });
+              setInputValue(place.formatted_address);
+            }
+          });
+        } catch (err) {
+          // Silent fail
+        }
+      }
+    }
+  };
+
+  // Quick suggestions for common places in Geneva area
+  const quickSuggestions = [
+    { name: "Aéroport de Genève", lat: 46.2370, lng: 6.1092 },
+    { name: "Gare de Genève-Cornavin", lat: 46.2100, lng: 6.1422 },
+    { name: "Hôpital Universitaire de Genève (HUG)", lat: 46.1936, lng: 6.1494 },
+    { name: "Palexpo Genève", lat: 46.2342, lng: 6.1116 },
+    { name: "Nations Unies, Genève", lat: 46.2268, lng: 6.1409 },
+    { name: "Jet d'Eau, Genève", lat: 46.2074, lng: 6.1555 }
+  ];
 
   return (
     <div className="relative">
@@ -124,12 +167,49 @@ const PlacesAutocomplete = ({ value, onChange, onSelect, placeholder }) => {
       <input
         ref={inputRef}
         type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={inputValue}
+        onChange={(e) => {
+          setInputValue(e.target.value);
+          setShowSuggestions(e.target.value.length > 0);
+        }}
+        onKeyDown={handleKeyDown}
+        onFocus={() => setShowSuggestions(inputValue.length > 0 || true)}
+        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
         placeholder={placeholder}
+        autoComplete="off"
         className="w-full h-14 bg-navy-800/60 backdrop-blur-sm border-2 border-navy-700 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 rounded-xl font-medium placeholder:text-slate-500 text-white pl-12 pr-4 transition-all duration-300"
         data-testid="destination-input"
       />
+      
+      {/* Quick suggestions dropdown */}
+      {showSuggestions && !inputValue && (
+        <div className="absolute top-full left-0 right-0 mt-2 bg-navy-800/95 backdrop-blur-xl border border-navy-700 rounded-xl shadow-xl z-50 overflow-hidden">
+          <p className="px-4 py-2 text-xs text-slate-400 border-b border-navy-700">Suggestions rapides</p>
+          {quickSuggestions.map((place, index) => (
+            <button
+              key={index}
+              type="button"
+              className="w-full px-4 py-3 text-left text-white hover:bg-orange-500/20 transition-colors flex items-center gap-3"
+              onClick={() => {
+                setInputValue(place.name);
+                setShowSuggestions(false);
+                onSelect({
+                  address: place.name,
+                  lat: place.lat,
+                  lng: place.lng
+                });
+              }}
+            >
+              <MapPin className="w-4 h-4 text-orange-400 flex-shrink-0" />
+              <span>{place.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      
+      <p className="text-xs text-slate-500 mt-2">
+        Tapez une adresse puis appuyez sur Entrée, ou choisissez une suggestion
+      </p>
     </div>
   );
 };
@@ -620,8 +700,6 @@ const ClientDashboard = () => {
                   </div>
                   
                   <PlacesAutocomplete
-                    value={destination.address}
-                    onChange={(val) => setDestination({ ...destination, address: val })}
                     onSelect={handleDestinationSelect}
                     placeholder="Tapez une adresse..."
                   />
