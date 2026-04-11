@@ -990,12 +990,17 @@ async def admin_get_chauffeurs(user=Depends(get_current_user)):
     if user.get("type") != "admin":
         raise HTTPException(status_code=403, detail="Accès non autorisé")
     
-    chauffeurs = await db.chauffeurs.find({}, {"_id": 0, "password": 0}).to_list(1000)
+    chauffeurs = await db.chauffeurs.find({}, {"_id": 0, "password": 0, "hashed_password": 0}).to_list(1000)
     
-    # Get revenus for each
+    # Get revenus for each - handle chauffeurs without id field
     for c in chauffeurs:
-        revenus = await db.chauffeur_revenus.find_one({"chauffeur_id": c["id"]}, {"_id": 0})
-        c["revenus"] = revenus
+        chauffeur_id = c.get("id") or c.get("code_chauffeur")
+        if chauffeur_id:
+            revenus = await db.chauffeur_revenus.find_one({"chauffeur_id": chauffeur_id}, {"_id": 0})
+            c["revenus"] = revenus
+            c["id"] = chauffeur_id  # Ensure id field exists
+        else:
+            c["revenus"] = None
     
     return chauffeurs
 

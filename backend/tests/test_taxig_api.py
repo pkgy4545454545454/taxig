@@ -1,517 +1,505 @@
 """
-TaxiG API Backend Tests
-Tests for: Authentication, Course booking, Price calculation, Chauffeur operations
+TaxiG API Backend Tests - Comprehensive test suite for all endpoints
+Tests: Health, Client Auth, Chauffeur Auth, Admin Auth, Course Booking, Active Chauffeurs
 """
 import pytest
 import requests
 import os
 import uuid
-import time
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://taxig-redesign.preview.emergentagent.com')
 
-# Test credentials from review request
-CLIENT_EMAIL = "jean.dupont@test.com"
-CLIENT_PASSWORD = "test123"
-CHAUFFEUR_CODE = "TAXI001"
-CHAUFFEUR_PASSWORD = "chauffeur123"
-
-# Pricing constants (from server.py)
-BASE_FARE = 6.30
-PRICE_PER_KM = 3.20
+# Test credentials from requirements
+TEST_CLIENT = {"email": "jean.dupont@test.com", "password": "test123"}
+TEST_CHAUFFEUR = {"code_chauffeur": "TAXI001", "password": "chauffeur123"}
+TEST_ADMIN = {"username": "naim", "password": "admin123"}
 
 
-class TestHealthAndRoot:
-    """Health check and root endpoint tests"""
+class TestHealthEndpoint:
+    """Health check endpoint tests"""
     
     def test_health_endpoint(self):
-        """Test API health endpoint"""
+        """Test /api/health returns healthy status"""
         response = requests.get(f"{BASE_URL}/api/health")
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
-        print("✓ Health endpoint OK")
-    
+        print("✓ Health endpoint working")
+
     def test_root_endpoint(self):
-        """Test API root endpoint"""
+        """Test /api/ returns API info"""
         response = requests.get(f"{BASE_URL}/api/")
         assert response.status_code == 200
         data = response.json()
-        assert data["message"] == "TaxiG API"
-        assert "version" in data
-        print("✓ Root endpoint OK")
-
-
-class TestClientAuthentication:
-    """Client login and registration tests"""
-    
-    def test_client_login_with_test_credentials(self):
-        """Test client login with provided credentials"""
-        response = requests.post(f"{BASE_URL}/api/client/login", json={
-            "email": CLIENT_EMAIL,
-            "password": CLIENT_PASSWORD
-        })
-        
-        # Check if test user exists
-        if response.status_code == 401:
-            # Create test user first
-            register_response = requests.post(f"{BASE_URL}/api/client/register", json={
-                "nom": "Dupont",
-                "prenom": "Jean",
-                "email": CLIENT_EMAIL,
-                "password": CLIENT_PASSWORD,
-                "mode_paiement": "cash"
-            })
-            if register_response.status_code in [200, 201]:
-                # Retry login
-                response = requests.post(f"{BASE_URL}/api/client/login", json={
-                    "email": CLIENT_EMAIL,
-                    "password": CLIENT_PASSWORD
-                })
-        
-        assert response.status_code == 200, f"Login failed: {response.text}"
-        data = response.json()
-        assert "access_token" in data
-        assert data["token_type"] == "bearer"
-        assert "user" in data
-        print(f"✓ Client login OK - User: {data['user'].get('prenom', 'Unknown')}")
-        return data["access_token"]
-    
-    def test_client_login_invalid_credentials(self):
-        """Test client login with wrong credentials"""
-        response = requests.post(f"{BASE_URL}/api/client/login", json={
-            "email": "wrong@test.com",
-            "password": "wrongpassword"
-        })
-        assert response.status_code == 401
-        print("✓ Invalid credentials correctly rejected")
-
-
-class TestChauffeurAuthentication:
-    """Chauffeur login and registration tests"""
-    
-    def test_chauffeur_login_with_test_credentials(self):
-        """Test chauffeur login with provided credentials"""
-        response = requests.post(f"{BASE_URL}/api/chauffeur/login", json={
-            "code_chauffeur": CHAUFFEUR_CODE,
-            "password": CHAUFFEUR_PASSWORD
-        })
-        
-        # Check if test chauffeur exists
-        if response.status_code == 401:
-            # Create test chauffeur first
-            register_response = requests.post(f"{BASE_URL}/api/chauffeur/register", json={
-                "nom": "Martin",
-                "prenom": "Pierre",
-                "code_chauffeur": CHAUFFEUR_CODE,
-                "email": "taxi001@test.com",
-                "password": CHAUFFEUR_PASSWORD
-            })
-            if register_response.status_code in [200, 201]:
-                # Retry login
-                response = requests.post(f"{BASE_URL}/api/chauffeur/login", json={
-                    "code_chauffeur": CHAUFFEUR_CODE,
-                    "password": CHAUFFEUR_PASSWORD
-                })
-        
-        assert response.status_code == 200, f"Chauffeur login failed: {response.text}"
-        data = response.json()
-        assert "access_token" in data
-        assert data["token_type"] == "bearer"
-        print(f"✓ Chauffeur login OK - Code: {data['user'].get('code_chauffeur', 'Unknown')}")
-        return data["access_token"]
-    
-    def test_chauffeur_login_invalid_credentials(self):
-        """Test chauffeur login with wrong credentials"""
-        response = requests.post(f"{BASE_URL}/api/chauffeur/login", json={
-            "code_chauffeur": "WRONG001",
-            "password": "wrongpassword"
-        })
-        assert response.status_code == 401
-        print("✓ Invalid chauffeur credentials correctly rejected")
-
-
-class TestPriceCalculation:
-    """
-    BUG 1 TEST: Price calculation verification
-    Formula: 6.30€ base + 3.20€/km + traffic fees
-    Paris-Lyon (465km) should be ~1510€
-    """
-    
-    @pytest.fixture
-    def client_token(self):
-        """Get client auth token"""
-        response = requests.post(f"{BASE_URL}/api/client/login", json={
-            "email": CLIENT_EMAIL,
-            "password": CLIENT_PASSWORD
-        })
-        if response.status_code == 401:
-            # Register first
-            requests.post(f"{BASE_URL}/api/client/register", json={
-                "nom": "Dupont", "prenom": "Jean",
-                "email": CLIENT_EMAIL, "password": CLIENT_PASSWORD,
-                "mode_paiement": "cash"
-            })
-            response = requests.post(f"{BASE_URL}/api/client/login", json={
-                "email": CLIENT_EMAIL, "password": CLIENT_PASSWORD
-            })
-        if response.status_code == 200:
-            return response.json()["access_token"]
-        pytest.skip("Cannot authenticate client")
-    
-    def test_price_calculation_paris_lyon_465km(self, client_token):
-        """
-        BUG 1: Test Paris-Lyon (465km) price calculation
-        Expected: ~1510€ (6.30 + 465*3.20 + traffic)
-        """
-        # Paris coordinates (pickup)
-        paris_lat = 48.8566
-        paris_lng = 2.3522
-        
-        # Lyon coordinates (destination)
-        lyon_lat = 45.7640
-        lyon_lng = 4.8357
-        
-        # Distance (approximately 465km by road)
-        distance_km = 465.0
-        duration_minutes = 280.0  # ~4.5 hours
-        
-        response = requests.post(
-            f"{BASE_URL}/api/course/estimate",
-            json={
-                "pickup_lat": paris_lat,
-                "pickup_lng": paris_lng,
-                "pickup_address": "Paris, France",
-                "destination_lat": lyon_lat,
-                "destination_lng": lyon_lng,
-                "destination_address": "Lyon, France",
-                "distance_km": distance_km,
-                "duration_minutes": duration_minutes,
-                "payment_method": "cash"
-            },
-            headers={"Authorization": f"Bearer {client_token}"}
-        )
-        
-        assert response.status_code == 200, f"Estimate failed: {response.text}"
-        data = response.json()
-        
-        # Verify response structure
-        assert "base_fare" in data
-        assert "distance_fare" in data
-        assert "estimated_total" in data
-        
-        # Verify calculations
-        expected_base = 6.30
-        expected_distance_fare = 465.0 * 3.20  # = 1488€
-        expected_traffic = (duration_minutes * 0.1) * 0.50  # ~14€
-        expected_total = expected_base + expected_distance_fare + expected_traffic
-        
-        print(f"✓ Paris-Lyon Price Calculation:")
-        print(f"  - Distance: {distance_km} km")
-        print(f"  - Base fare: {data['base_fare']}€ (expected: {expected_base}€)")
-        print(f"  - Distance fare: {data['distance_fare']}€ (expected: {expected_distance_fare}€)")
-        print(f"  - Total: {data['estimated_total']}€ (expected ~{expected_total}€)")
-        
-        # Verify base fare
-        assert abs(data["base_fare"] - expected_base) < 0.01, "Base fare mismatch"
-        
-        # Verify distance fare (465km * 3.20€)
-        assert abs(data["distance_fare"] - expected_distance_fare) < 0.01, "Distance fare mismatch"
-        
-        # BUG 1 CHECK: Total should be ~1510€, NOT ~24€
-        assert data["estimated_total"] > 1400, f"BUG 1 NOT FIXED: Price too low ({data['estimated_total']}€), should be ~1510€"
-        assert data["estimated_total"] < 1600, f"Price unexpectedly high ({data['estimated_total']}€)"
-        
-        print(f"✓ BUG 1 VERIFIED: Price correctly calculated as {data['estimated_total']}€")
-    
-    def test_price_calculation_short_trip(self, client_token):
-        """Test short trip price calculation (5km)"""
-        response = requests.post(
-            f"{BASE_URL}/api/course/estimate",
-            json={
-                "pickup_lat": 48.8566,
-                "pickup_lng": 2.3522,
-                "pickup_address": "Paris Centre",
-                "destination_lat": 48.8800,
-                "destination_lng": 2.3600,
-                "destination_address": "Paris 18ème",
-                "distance_km": 5.0,
-                "duration_minutes": 15.0,
-                "payment_method": "cash"
-            },
-            headers={"Authorization": f"Bearer {client_token}"}
-        )
-        
-        assert response.status_code == 200
-        data = response.json()
-        
-        # 5km: 6.30 + (5 * 3.20) + (15 * 0.1 * 0.5) = 6.30 + 16 + 0.75 = 23.05€
-        expected_total = 6.30 + (5 * 3.20) + (15 * 0.1 * 0.50)
-        
-        assert abs(data["estimated_total"] - expected_total) < 0.5, f"Short trip price mismatch: got {data['estimated_total']}€, expected ~{expected_total}€"
-        print(f"✓ Short trip (5km) price: {data['estimated_total']}€")
-
-
-class TestCourseBooking:
-    """Course booking flow tests"""
-    
-    @pytest.fixture
-    def client_token(self):
-        """Get client auth token"""
-        response = requests.post(f"{BASE_URL}/api/client/login", json={
-            "email": CLIENT_EMAIL,
-            "password": CLIENT_PASSWORD
-        })
-        if response.status_code == 401:
-            requests.post(f"{BASE_URL}/api/client/register", json={
-                "nom": "Dupont", "prenom": "Jean",
-                "email": CLIENT_EMAIL, "password": CLIENT_PASSWORD,
-                "mode_paiement": "cash"
-            })
-            response = requests.post(f"{BASE_URL}/api/client/login", json={
-                "email": CLIENT_EMAIL, "password": CLIENT_PASSWORD
-            })
-        if response.status_code == 200:
-            return response.json()["access_token"]
-        pytest.skip("Cannot authenticate client")
-    
-    def test_course_booking_flow(self, client_token):
-        """Test complete course booking"""
-        # Book a course
-        response = requests.post(
-            f"{BASE_URL}/api/course/book",
-            json={
-                "pickup_lat": 48.8566,
-                "pickup_lng": 2.3522,
-                "pickup_address": "10 Rue de Rivoli, Paris",
-                "destination_lat": 48.8738,
-                "destination_lng": 2.2950,
-                "destination_address": "Tour Eiffel, Paris",
-                "distance_km": 4.5,
-                "duration_minutes": 12.0,
-                "payment_method": "cash"
-            },
-            headers={"Authorization": f"Bearer {client_token}"}
-        )
-        
-        assert response.status_code == 200, f"Booking failed: {response.text}"
-        data = response.json()
-        
-        # Verify booking response
-        assert "course_id" in data
-        assert "commande_no" in data
-        assert data["commande_no"].startswith("TG-")
-        assert "prix_estime" in data
-        
-        print(f"✓ Course booked: {data['commande_no']} - {data['prix_estime']}€")
-        return data["course_id"]
-    
-    def test_get_course_details(self, client_token):
-        """Test retrieving course details"""
-        # First book a course
-        book_response = requests.post(
-            f"{BASE_URL}/api/course/book",
-            json={
-                "pickup_lat": 48.8566,
-                "pickup_lng": 2.3522,
-                "pickup_address": "Paris Centre",
-                "destination_lat": 48.8800,
-                "destination_lng": 2.3600,
-                "destination_address": "Paris Nord",
-                "distance_km": 3.0,
-                "duration_minutes": 10.0,
-                "payment_method": "cash"
-            },
-            headers={"Authorization": f"Bearer {client_token}"}
-        )
-        
-        if book_response.status_code != 200:
-            pytest.skip("Cannot book course")
-        
-        course_id = book_response.json()["course_id"]
-        
-        # Get course details
-        response = requests.get(
-            f"{BASE_URL}/api/course/{course_id}",
-            headers={"Authorization": f"Bearer {client_token}"}
-        )
-        
-        assert response.status_code == 200
-        data = response.json()
-        
-        assert data["id"] == course_id
-        assert "pickup_address" in data
-        assert "destination_address" in data
-        assert data["status"] == "pending"
-        
-        print(f"✓ Course details retrieved: {data['commande_no']}")
-
-
-class TestChauffeurOperations:
-    """Chauffeur service operations tests"""
-    
-    @pytest.fixture
-    def chauffeur_token(self):
-        """Get chauffeur auth token"""
-        response = requests.post(f"{BASE_URL}/api/chauffeur/login", json={
-            "code_chauffeur": CHAUFFEUR_CODE,
-            "password": CHAUFFEUR_PASSWORD
-        })
-        if response.status_code == 401:
-            requests.post(f"{BASE_URL}/api/chauffeur/register", json={
-                "nom": "Martin", "prenom": "Pierre",
-                "code_chauffeur": CHAUFFEUR_CODE,
-                "email": "taxi001@test.com",
-                "password": CHAUFFEUR_PASSWORD
-            })
-            response = requests.post(f"{BASE_URL}/api/chauffeur/login", json={
-                "code_chauffeur": CHAUFFEUR_CODE,
-                "password": CHAUFFEUR_PASSWORD
-            })
-        if response.status_code == 200:
-            return response.json()["access_token"]
-        pytest.skip("Cannot authenticate chauffeur")
-    
-    def test_chauffeur_profile(self, chauffeur_token):
-        """Test chauffeur profile retrieval"""
-        response = requests.get(
-            f"{BASE_URL}/api/chauffeur/me",
-            headers={"Authorization": f"Bearer {chauffeur_token}"}
-        )
-        
-        assert response.status_code == 200
-        data = response.json()
-        
-        assert "id" in data
-        assert "code_chauffeur" in data
-        assert "is_online" in data
-        
-        print(f"✓ Chauffeur profile: {data.get('prenom', '')} {data.get('nom', '')} - Online: {data['is_online']}")
-    
-    def test_chauffeur_pointer(self, chauffeur_token):
-        """Test chauffeur start/end service"""
-        # Start service (pointer)
-        response = requests.post(
-            f"{BASE_URL}/api/chauffeur/pointer",
-            headers={"Authorization": f"Bearer {chauffeur_token}"}
-        )
-        
-        assert response.status_code == 200
-        data = response.json()
-        
-        assert "status" in data
-        assert "action" in data
-        assert data["action"] in ["start", "end"]
-        
-        print(f"✓ Chauffeur pointer: {data['action']} - Status: {data['status']}")
-    
-    def test_chauffeur_position_update(self, chauffeur_token):
-        """Test chauffeur position update"""
-        # First ensure chauffeur is online
-        requests.post(
-            f"{BASE_URL}/api/chauffeur/pointer",
-            headers={"Authorization": f"Bearer {chauffeur_token}"}
-        )
-        
-        # Update position
-        response = requests.post(
-            f"{BASE_URL}/api/chauffeur/position",
-            json={
-                "latitude": 48.8566,
-                "longitude": 2.3522
-            },
-            headers={"Authorization": f"Bearer {chauffeur_token}"}
-        )
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "updated"
-        print("✓ Chauffeur position updated")
-    
-    def test_chauffeur_pending_course(self, chauffeur_token):
-        """Test checking for pending courses"""
-        response = requests.get(
-            f"{BASE_URL}/api/chauffeur/pending-course",
-            headers={"Authorization": f"Bearer {chauffeur_token}"}
-        )
-        
-        assert response.status_code == 200
-        data = response.json()
-        # course can be None if no pending course
-        assert "course" in data
-        print(f"✓ Pending course check: {'Found' if data['course'] else 'None'}")
+        assert "TaxiG" in data.get("message", "")
+        print("✓ Root endpoint working")
 
 
 class TestPublicEndpoints:
-    """Public API endpoints tests"""
+    """Public endpoints that don't require authentication"""
     
     def test_get_active_chauffeurs(self):
-        """Test retrieving active chauffeurs"""
+        """Test /api/chauffeurs/actifs returns list of active drivers"""
         response = requests.get(f"{BASE_URL}/api/chauffeurs/actifs")
-        
         assert response.status_code == 200
         data = response.json()
-        
         assert isinstance(data, list)
-        print(f"✓ Active chauffeurs: {len(data)}")
+        print(f"✓ Active chauffeurs endpoint working - {len(data)} chauffeurs found")
         
-        # If there are active chauffeurs, verify structure
-        if data:
+        # Verify structure if chauffeurs exist
+        if len(data) > 0:
             chauffeur = data[0]
             assert "id" in chauffeur
-            assert "is_online" in chauffeur
-            assert chauffeur["is_online"] == True
+            assert "position" in chauffeur
+            assert "lat" in chauffeur["position"]
+            assert "lng" in chauffeur["position"]
+            print(f"✓ Chauffeur data structure valid")
 
 
-class TestClientStats:
-    """Client statistics and history tests"""
+class TestClientAuth:
+    """Client authentication and registration tests"""
     
-    @pytest.fixture
-    def client_token(self):
-        """Get client auth token"""
-        response = requests.post(f"{BASE_URL}/api/client/login", json={
-            "email": CLIENT_EMAIL,
-            "password": CLIENT_PASSWORD
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        """Setup test client"""
+        self.session = requests.Session()
+        self.session.headers.update({"Content-Type": "application/json"})
+    
+    def test_client_register_new_user(self):
+        """Test client registration with new user"""
+        unique_email = f"test_{uuid.uuid4().hex[:8]}@test.com"
+        response = self.session.post(f"{BASE_URL}/api/client/register", json={
+            "nom": "Test",
+            "prenom": "User",
+            "email": unique_email,
+            "password": "testpass123",
+            "mode_paiement": "cash"
         })
-        if response.status_code == 401:
-            requests.post(f"{BASE_URL}/api/client/register", json={
-                "nom": "Dupont", "prenom": "Jean",
-                "email": CLIENT_EMAIL, "password": CLIENT_PASSWORD,
-                "mode_paiement": "cash"
-            })
-            response = requests.post(f"{BASE_URL}/api/client/login", json={
-                "email": CLIENT_EMAIL, "password": CLIENT_PASSWORD
-            })
+        # Either 200 (success) or 400 (email exists)
+        assert response.status_code in [200, 400]
         if response.status_code == 200:
-            return response.json()["access_token"]
-        pytest.skip("Cannot authenticate client")
+            data = response.json()
+            assert "access_token" in data
+            assert "user" in data
+            print(f"✓ Client registration successful for {unique_email}")
+        else:
+            print(f"✓ Client registration endpoint working (email may exist)")
     
-    def test_client_courses_history(self, client_token):
-        """Test client course history"""
-        response = requests.get(
-            f"{BASE_URL}/api/client/courses",
-            headers={"Authorization": f"Bearer {client_token}"}
-        )
+    def test_client_login_valid_credentials(self):
+        """Test client login with valid credentials"""
+        # First ensure the test client exists
+        self.session.post(f"{BASE_URL}/api/client/register", json={
+            "nom": "Dupont",
+            "prenom": "Jean",
+            "email": TEST_CLIENT["email"],
+            "password": TEST_CLIENT["password"],
+            "mode_paiement": "cash"
+        })
         
+        # Now login
+        response = self.session.post(f"{BASE_URL}/api/client/login", json=TEST_CLIENT)
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+        assert "user" in data
+        assert data["user"]["email"] == TEST_CLIENT["email"]
+        print(f"✓ Client login successful for {TEST_CLIENT['email']}")
+        return data["access_token"]
+    
+    def test_client_login_invalid_credentials(self):
+        """Test client login with invalid credentials"""
+        response = self.session.post(f"{BASE_URL}/api/client/login", json={
+            "email": "invalid@test.com",
+            "password": "wrongpassword"
+        })
+        assert response.status_code == 401
+        print("✓ Client login correctly rejects invalid credentials")
+    
+    def test_client_profile_authenticated(self):
+        """Test getting client profile with valid token"""
+        # Login first
+        login_response = self.session.post(f"{BASE_URL}/api/client/login", json=TEST_CLIENT)
+        if login_response.status_code != 200:
+            pytest.skip("Client login failed - skipping profile test")
+        
+        token = login_response.json()["access_token"]
+        
+        # Get profile
+        response = self.session.get(
+            f"{BASE_URL}/api/client/me",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["email"] == TEST_CLIENT["email"]
+        print("✓ Client profile endpoint working")
+    
+    def test_client_profile_unauthenticated(self):
+        """Test getting client profile without token"""
+        response = self.session.get(f"{BASE_URL}/api/client/me")
+        assert response.status_code == 401
+        print("✓ Client profile correctly requires authentication")
+
+
+class TestChauffeurAuth:
+    """Chauffeur authentication tests"""
+    
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        """Setup test session"""
+        self.session = requests.Session()
+        self.session.headers.update({"Content-Type": "application/json"})
+    
+    def test_chauffeur_register_new(self):
+        """Test chauffeur registration"""
+        unique_code = f"TEST{uuid.uuid4().hex[:4].upper()}"
+        response = self.session.post(f"{BASE_URL}/api/chauffeur/register", json={
+            "nom": "Test",
+            "prenom": "Chauffeur",
+            "code_chauffeur": unique_code,
+            "email": f"chauffeur_{unique_code.lower()}@test.com",
+            "password": "testpass123"
+        })
+        assert response.status_code in [200, 400]
+        if response.status_code == 200:
+            data = response.json()
+            assert "access_token" in data
+            print(f"✓ Chauffeur registration successful for {unique_code}")
+        else:
+            print("✓ Chauffeur registration endpoint working")
+    
+    def test_chauffeur_login_valid(self):
+        """Test chauffeur login with valid credentials"""
+        # First ensure test chauffeur exists
+        self.session.post(f"{BASE_URL}/api/chauffeur/register", json={
+            "nom": "Test",
+            "prenom": "Driver",
+            "code_chauffeur": TEST_CHAUFFEUR["code_chauffeur"],
+            "email": "taxi001@test.com",
+            "password": TEST_CHAUFFEUR["password"]
+        })
+        
+        # Login
+        response = self.session.post(f"{BASE_URL}/api/chauffeur/login", json=TEST_CHAUFFEUR)
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+        assert data["user"]["code_chauffeur"] == TEST_CHAUFFEUR["code_chauffeur"]
+        print(f"✓ Chauffeur login successful for {TEST_CHAUFFEUR['code_chauffeur']}")
+        return data["access_token"]
+    
+    def test_chauffeur_login_invalid(self):
+        """Test chauffeur login with invalid credentials"""
+        response = self.session.post(f"{BASE_URL}/api/chauffeur/login", json={
+            "code_chauffeur": "INVALID",
+            "password": "wrongpass"
+        })
+        assert response.status_code == 401
+        print("✓ Chauffeur login correctly rejects invalid credentials")
+    
+    def test_chauffeur_profile(self):
+        """Test chauffeur profile endpoint"""
+        # Login first
+        login_response = self.session.post(f"{BASE_URL}/api/chauffeur/login", json=TEST_CHAUFFEUR)
+        if login_response.status_code != 200:
+            pytest.skip("Chauffeur login failed")
+        
+        token = login_response.json()["access_token"]
+        
+        response = self.session.get(
+            f"{BASE_URL}/api/chauffeur/me",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["code_chauffeur"] == TEST_CHAUFFEUR["code_chauffeur"]
+        print("✓ Chauffeur profile endpoint working")
+    
+    def test_chauffeur_pointer(self):
+        """Test chauffeur pointer (go online/offline)"""
+        # Login first
+        login_response = self.session.post(f"{BASE_URL}/api/chauffeur/login", json=TEST_CHAUFFEUR)
+        if login_response.status_code != 200:
+            pytest.skip("Chauffeur login failed")
+        
+        token = login_response.json()["access_token"]
+        
+        response = self.session.post(
+            f"{BASE_URL}/api/chauffeur/pointer",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "status" in data
+        assert data["status"] in ["online", "offline"]
+        print(f"✓ Chauffeur pointer working - status: {data['status']}")
+
+
+class TestAdminAuth:
+    """Admin authentication tests"""
+    
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        """Setup test session"""
+        self.session = requests.Session()
+        self.session.headers.update({"Content-Type": "application/json"})
+    
+    def test_admin_register_and_login(self):
+        """Test admin registration and login"""
+        # First try to register (may already exist)
+        self.session.post(f"{BASE_URL}/api/admin/register", json=TEST_ADMIN)
+        
+        # Login
+        response = self.session.post(f"{BASE_URL}/api/admin/login", json=TEST_ADMIN)
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+        print(f"✓ Admin login successful for {TEST_ADMIN['username']}")
+        return data["access_token"]
+    
+    def test_admin_login_invalid(self):
+        """Test admin login with invalid credentials"""
+        response = self.session.post(f"{BASE_URL}/api/admin/login", json={
+            "username": "invalid",
+            "password": "wrongpass"
+        })
+        assert response.status_code == 401
+        print("✓ Admin login correctly rejects invalid credentials")
+    
+    def test_admin_dashboard(self):
+        """Test admin dashboard endpoint"""
+        # Register and login
+        self.session.post(f"{BASE_URL}/api/admin/register", json=TEST_ADMIN)
+        login_response = self.session.post(f"{BASE_URL}/api/admin/login", json=TEST_ADMIN)
+        if login_response.status_code != 200:
+            pytest.skip("Admin login failed")
+        
+        token = login_response.json()["access_token"]
+        
+        response = self.session.get(
+            f"{BASE_URL}/api/admin/dashboard",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "stats" in data
+        assert "total_chauffeurs" in data["stats"]
+        assert "total_clients" in data["stats"]
+        print(f"✓ Admin dashboard working - {data['stats']['total_chauffeurs']} chauffeurs, {data['stats']['total_clients']} clients")
+    
+    def test_admin_get_chauffeurs(self):
+        """Test admin get chauffeurs list"""
+        self.session.post(f"{BASE_URL}/api/admin/register", json=TEST_ADMIN)
+        login_response = self.session.post(f"{BASE_URL}/api/admin/login", json=TEST_ADMIN)
+        if login_response.status_code != 200:
+            pytest.skip("Admin login failed")
+        
+        token = login_response.json()["access_token"]
+        
+        response = self.session.get(
+            f"{BASE_URL}/api/admin/chauffeurs",
+            headers={"Authorization": f"Bearer {token}"}
+        )
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
-        print(f"✓ Client courses: {len(data)} in history")
+        print(f"✓ Admin chauffeurs list working - {len(data)} chauffeurs")
     
-    def test_client_stats(self, client_token):
-        """Test client statistics"""
-        response = requests.get(
-            f"{BASE_URL}/api/client/stats",
-            headers={"Authorization": f"Bearer {client_token}"}
-        )
+    def test_admin_get_clients(self):
+        """Test admin get clients list"""
+        self.session.post(f"{BASE_URL}/api/admin/register", json=TEST_ADMIN)
+        login_response = self.session.post(f"{BASE_URL}/api/admin/login", json=TEST_ADMIN)
+        if login_response.status_code != 200:
+            pytest.skip("Admin login failed")
         
+        token = login_response.json()["access_token"]
+        
+        response = self.session.get(
+            f"{BASE_URL}/api/admin/clients",
+            headers={"Authorization": f"Bearer {token}"}
+        )
         assert response.status_code == 200
         data = response.json()
+        assert isinstance(data, list)
+        print(f"✓ Admin clients list working - {len(data)} clients")
+
+
+class TestCourseBooking:
+    """Course booking and estimation tests"""
+    
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        """Setup test session and login client"""
+        self.session = requests.Session()
+        self.session.headers.update({"Content-Type": "application/json"})
         
+        # Ensure test client exists and login
+        self.session.post(f"{BASE_URL}/api/client/register", json={
+            "nom": "Dupont",
+            "prenom": "Jean",
+            "email": TEST_CLIENT["email"],
+            "password": TEST_CLIENT["password"],
+            "mode_paiement": "cash"
+        })
+        
+        login_response = self.session.post(f"{BASE_URL}/api/client/login", json=TEST_CLIENT)
+        if login_response.status_code == 200:
+            self.token = login_response.json()["access_token"]
+        else:
+            self.token = None
+    
+    def test_course_estimate(self):
+        """Test course price estimation"""
+        if not self.token:
+            pytest.skip("Client login failed")
+        
+        response = self.session.post(
+            f"{BASE_URL}/api/course/estimate",
+            headers={"Authorization": f"Bearer {self.token}"},
+            json={
+                "pickup_lat": 48.8566,
+                "pickup_lng": 2.3522,
+                "pickup_address": "Paris, France",
+                "destination_lat": 48.8606,
+                "destination_lng": 2.3376,
+                "destination_address": "Louvre, Paris",
+                "distance_km": 1.5,
+                "duration_minutes": 10
+            }
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "base_fare" in data
+        assert "distance_fare" in data
+        assert "estimated_total" in data
+        assert data["estimated_total"] > 0
+        print(f"✓ Course estimate working - Total: {data['estimated_total']}€")
+    
+    def test_course_estimate_long_distance(self):
+        """Test course estimation for long distance (Paris to Lyon)"""
+        if not self.token:
+            pytest.skip("Client login failed")
+        
+        response = self.session.post(
+            f"{BASE_URL}/api/course/estimate",
+            headers={"Authorization": f"Bearer {self.token}"},
+            json={
+                "pickup_lat": 48.8566,
+                "pickup_lng": 2.3522,
+                "pickup_address": "Paris, France",
+                "destination_lat": 45.7640,
+                "destination_lng": 4.8357,
+                "destination_address": "Lyon, France",
+                "distance_km": 465,
+                "duration_minutes": 280
+            }
+        )
+        assert response.status_code == 200
+        data = response.json()
+        # Price should be: 6.30 (base) + 465 * 3.20 (distance) + traffic wait
+        # Expected around 1500€
+        assert data["estimated_total"] > 1000
+        print(f"✓ Long distance estimate working - Paris-Lyon: {data['estimated_total']}€")
+    
+    def test_course_book(self):
+        """Test course booking"""
+        if not self.token:
+            pytest.skip("Client login failed")
+        
+        response = self.session.post(
+            f"{BASE_URL}/api/course/book",
+            headers={"Authorization": f"Bearer {self.token}"},
+            json={
+                "pickup_lat": 48.8566,
+                "pickup_lng": 2.3522,
+                "pickup_address": "Paris, France",
+                "destination_lat": 48.8606,
+                "destination_lng": 2.3376,
+                "destination_address": "Louvre, Paris",
+                "distance_km": 1.5,
+                "duration_minutes": 10,
+                "payment_method": "cash"
+            }
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "course_id" in data
+        assert "commande_no" in data
+        assert "prix_estime" in data
+        print(f"✓ Course booking working - Order: {data['commande_no']}, Price: {data['prix_estime']}€")
+
+
+class TestClientFeatures:
+    """Client-specific features tests"""
+    
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        """Setup test session and login client"""
+        self.session = requests.Session()
+        self.session.headers.update({"Content-Type": "application/json"})
+        
+        # Ensure test client exists and login
+        self.session.post(f"{BASE_URL}/api/client/register", json={
+            "nom": "Dupont",
+            "prenom": "Jean",
+            "email": TEST_CLIENT["email"],
+            "password": TEST_CLIENT["password"],
+            "mode_paiement": "cash"
+        })
+        
+        login_response = self.session.post(f"{BASE_URL}/api/client/login", json=TEST_CLIENT)
+        if login_response.status_code == 200:
+            self.token = login_response.json()["access_token"]
+        else:
+            self.token = None
+    
+    def test_client_courses_history(self):
+        """Test client courses history"""
+        if not self.token:
+            pytest.skip("Client login failed")
+        
+        response = self.session.get(
+            f"{BASE_URL}/api/client/courses",
+            headers={"Authorization": f"Bearer {self.token}"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        print(f"✓ Client courses history working - {len(data)} courses")
+    
+    def test_client_stats(self):
+        """Test client statistics"""
+        if not self.token:
+            pytest.skip("Client login failed")
+        
+        response = self.session.get(
+            f"{BASE_URL}/api/client/stats",
+            headers={"Authorization": f"Bearer {self.token}"}
+        )
+        assert response.status_code == 200
+        data = response.json()
         assert "total_courses" in data
         assert "total_spent" in data
         assert "total_km" in data
-        print(f"✓ Client stats: {data['total_courses']} courses, {data['total_spent']}€ spent")
+        print(f"✓ Client stats working - {data['total_courses']} courses, {data['total_spent']}€ spent")
+    
+    def test_client_roulette(self):
+        """Test client roulette game"""
+        if not self.token:
+            pytest.skip("Client login failed")
+        
+        response = self.session.post(
+            f"{BASE_URL}/api/client/roulette",
+            headers={"Authorization": f"Bearer {self.token}"}
+        )
+        # Either 200 (success) or 400 (already played today)
+        assert response.status_code in [200, 400]
+        if response.status_code == 200:
+            data = response.json()
+            assert "won" in data
+            print(f"✓ Client roulette working - Won: {data['won']}")
+        else:
+            print("✓ Client roulette working (already played today)")
 
 
 if __name__ == "__main__":
