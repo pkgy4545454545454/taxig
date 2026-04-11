@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, User, CreditCard, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, User, CreditCard, ArrowLeft, UserPlus } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -50,13 +50,19 @@ const ClientRegister = () => {
     }
   };
 
+  const inputClass = "h-14 bg-navy-800/60 backdrop-blur-sm border-2 border-navy-700 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 rounded-xl font-medium placeholder:text-slate-500 text-white pl-12 transition-all duration-300";
+
   return (
-    <div className="min-h-screen bg-[#09090B] flex flex-col">
+    <div className="min-h-screen bg-navy-gradient flex flex-col relative overflow-hidden">
+      {/* Background effects */}
+      <div className="absolute top-10 right-10 w-96 h-96 bg-orange-500/10 rounded-full blur-[120px] animate-float" />
+      <div className="absolute bottom-10 left-10 w-72 h-72 bg-navy-600/30 rounded-full blur-[100px]" />
+      
       {/* Header */}
-      <header className="p-4">
+      <header className="p-4 relative z-10 animate-slideDown">
         <Button 
           variant="ghost" 
-          className="text-white hover:text-[#FFD700]"
+          className="text-slate-300 hover:text-orange-400 hover:bg-white/5 rounded-xl transition-all duration-300"
           onClick={() => navigate('/')}
           data-testid="back-btn"
         >
@@ -66,25 +72,28 @@ const ClientRegister = () => {
       </header>
 
       {/* Register Form */}
-      <div className="flex-1 flex items-center justify-center px-4 py-8">
-        <div className="w-full max-w-md">
+      <div className="flex-1 flex items-center justify-center px-4 py-8 relative z-10">
+        <div className="w-full max-w-md animate-scaleIn">
           <div className="text-center mb-8">
-            <img src={LOGO_URL} alt="TaxiG" className="h-20 mx-auto mb-6" />
+            <img src={LOGO_URL} alt="TaxiG" className="h-16 mx-auto mb-4 drop-shadow-lg" />
+            <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-br from-orange-500/20 to-orange-600/10 rounded-2xl mb-4">
+              <UserPlus className="w-7 h-7 text-orange-400" />
+            </div>
             <h1 className="text-3xl font-bold text-white mb-2">Créer un compte</h1>
-            <p className="text-zinc-400">Rejoignez TaxiG en quelques secondes</p>
+            <p className="text-slate-400">Rejoignez TaxiG en quelques secondes</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="prenom" className="text-white">Prénom</Label>
+                <Label htmlFor="prenom" className="text-slate-300">Prénom</Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                   <Input
                     id="prenom"
                     type="text"
                     placeholder="Jean"
-                    className="input-taxi pl-10"
+                    className={inputClass}
                     value={formData.prenom}
                     onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
                     required
@@ -94,12 +103,12 @@ const ClientRegister = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="nom" className="text-white">Nom</Label>
+                <Label htmlFor="nom" className="text-slate-300">Nom</Label>
                 <Input
                   id="nom"
                   type="text"
                   placeholder="Dupont"
-                  className="input-taxi"
+                  className="h-14 bg-navy-800/60 backdrop-blur-sm border-2 border-navy-700 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 rounded-xl font-medium placeholder:text-slate-500 text-white px-4 transition-all duration-300"
                   value={formData.nom}
                   onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
                   required
@@ -109,14 +118,14 @@ const ClientRegister = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-white">Email</Label>
+              <Label htmlFor="email" className="text-slate-300">Email</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                 <Input
                   id="email"
                   type="email"
                   placeholder="votre@email.com"
-                  className="input-taxi pl-10"
+                  className={inputClass}
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
@@ -126,14 +135,14 @@ const ClientRegister = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-white">Mot de passe</Label>
+              <Label htmlFor="password" className="text-slate-300">Mot de passe</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                 <Input
                   id="password"
                   type="password"
                   placeholder="••••••••"
-                  className="input-taxi pl-10"
+                  className={inputClass}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   required
@@ -144,14 +153,14 @@ const ClientRegister = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-white">Confirmer le mot de passe</Label>
+              <Label htmlFor="confirmPassword" className="text-slate-300">Confirmer le mot de passe</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                 <Input
                   id="confirmPassword"
                   type="password"
                   placeholder="••••••••"
-                  className="input-taxi pl-10"
+                  className={inputClass}
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   required
@@ -161,25 +170,25 @@ const ClientRegister = () => {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-white">Mode de paiement préféré</Label>
+              <Label className="text-slate-300">Mode de paiement préféré</Label>
               <Select 
                 value={formData.mode_paiement} 
                 onValueChange={(value) => setFormData({ ...formData, mode_paiement: value })}
               >
-                <SelectTrigger className="input-taxi" data-testid="payment-method-select">
-                  <CreditCard className="w-5 h-5 mr-2 text-zinc-500" />
+                <SelectTrigger className="h-14 bg-navy-800/60 backdrop-blur-sm border-2 border-navy-700 focus:border-orange-500 rounded-xl text-white" data-testid="payment-method-select">
+                  <CreditCard className="w-5 h-5 mr-2 text-slate-500" />
                   <SelectValue placeholder="Choisir un mode de paiement" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Espèces</SelectItem>
-                  <SelectItem value="card">Carte bancaire</SelectItem>
+                <SelectContent className="bg-navy-800 border-navy-700">
+                  <SelectItem value="cash" className="text-white hover:bg-navy-700">Espèces</SelectItem>
+                  <SelectItem value="card" className="text-white hover:bg-navy-700">Carte bancaire</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <Button 
               type="submit" 
-              className="btn-taxi w-full h-12"
+              className="btn-taxi w-full h-14 text-lg mt-6"
               disabled={loading}
               data-testid="register-submit-btn"
             >
@@ -187,9 +196,9 @@ const ClientRegister = () => {
             </Button>
           </form>
 
-          <p className="text-center mt-6 text-zinc-400">
+          <p className="text-center mt-6 text-slate-400">
             Déjà un compte ?{' '}
-            <Link to="/client/login" className="text-[#FFD700] hover:underline" data-testid="login-link">
+            <Link to="/client/login" className="text-orange-400 hover:text-orange-300 hover:underline transition-colors" data-testid="login-link">
               Se connecter
             </Link>
           </p>
