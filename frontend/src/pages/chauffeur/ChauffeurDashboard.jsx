@@ -300,9 +300,6 @@ const ChauffeurDashboard = () => {
 
   // Calculate route with Google Directions
   const calculateRoute = useCallback(async (origin, destination) => {
-    console.log('=== CALCUL ROUTE ===');
-    console.log('Origin:', origin);
-    console.log('Destination:', destination);
     
     if (!window.google || !window.google.maps) {
       console.warn('Google Maps API not available, using straight line');
@@ -320,7 +317,6 @@ const ChauffeurDashboard = () => {
           destination: { lat: destination.lat, lng: destination.lng },
           travelMode: window.google.maps.TravelMode.DRIVING
         }, (res, status) => {
-          console.log('Directions API status:', status);
           if (status === 'OK') resolve(res);
           else reject(status);
         });
@@ -332,10 +328,8 @@ const ChauffeurDashboard = () => {
         
         // Decode the polyline - overview_polyline is an object with 'points' property
         const encodedPolyline = route.overview_polyline.points || route.overview_polyline;
-        console.log('Encoded polyline type:', typeof encodedPolyline);
         
         const polyline = decodePolyline(encodedPolyline);
-        console.log('Decoded polyline points:', polyline.length);
         setRoutePolyline(polyline);
         
         // Calculate ETA
@@ -350,7 +344,6 @@ const ChauffeurDashboard = () => {
           eta: eta.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
         });
         
-        console.log('Route calculated successfully:', leg.distance.text, leg.duration.text);
       }
     } catch (error) {
       console.error('Route calculation error:', error);
@@ -454,7 +447,6 @@ const ChauffeurDashboard = () => {
               const targetLat = course.status === 'in_progress' ? course.destination_lat : course.pickup_lat;
               const targetLng = course.status === 'in_progress' ? course.destination_lng : course.pickup_lng;
               
-              console.log('Course assigned, calculating route...');
               calculateRoute(
                 { lat: position[0], lng: position[1] },
                 { lat: targetLat, lng: targetLng }
@@ -515,7 +507,6 @@ const ChauffeurDashboard = () => {
         
         // Calculate route immediately to pickup - utiliser position réelle uniquement
         if (position) {
-          console.log('Calculating route after accepting course...');
           calculateRoute(
             { lat: position[0], lng: position[1] },
             { lat: incomingRequest.pickup_lat, lng: incomingRequest.pickup_lng }
