@@ -20,11 +20,11 @@ import 'leaflet/dist/leaflet.css';
 
 const LOGO_URL = "https://customer-assets.emergentagent.com/job_geolocab-platform/artifacts/6p3uaynm_1000103457-removebg-preview.png";
 
-// Chauffeur location icon (yellow car)
+// Chauffeur location icon (orange car)
 const chauffeurIcon = new L.DivIcon({
   className: 'chauffeur-marker',
   html: `<div style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
-    <svg viewBox="0 0 24 24" width="45" height="45" fill="#FFD700" stroke="#000" stroke-width="0.5">
+    <svg viewBox="0 0 24 24" width="45" height="45" fill="#FF6B00" stroke="#0A1628" stroke-width="0.5">
       <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/>
     </svg>
   </div>`,
@@ -138,6 +138,17 @@ const ChauffeurDashboard = () => {
   // Audio ref
   const audioRef = useRef(null);
   
+  // Refs for stable polling - prevents interval reset on GPS updates
+  const positionRef = useRef(null);
+  const incomingRequestRef = useRef(null);
+  const currentCourseRef = useRef(null);
+  const calculateRouteRef = useRef(null);
+  
+  // Keep refs in sync with state
+  useEffect(() => { positionRef.current = position; }, [position]);
+  useEffect(() => { incomingRequestRef.current = incomingRequest; }, [incomingRequest]);
+  useEffect(() => { currentCourseRef.current = currentCourse; }, [currentCourse]);
+  
   // Timer en temps réel - mise à jour chaque seconde
   useEffect(() => {
     if (!currentCourse || !courseStartTime) {
@@ -183,9 +194,9 @@ const ChauffeurDashboard = () => {
     const periodStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString('fr-FR');
     
     // Header with TaxiG branding
-    doc.setFillColor(9, 9, 11); // #09090B
+    doc.setFillColor(10, 22, 40); // Navy #0A1628
     doc.rect(0, 0, 210, 40, 'F');
-    doc.setTextColor(255, 215, 0); // Gold
+    doc.setTextColor(255, 107, 0); // Orange
     doc.setFontSize(24);
     doc.setFont('helvetica', 'bold');
     doc.text('TaxiG', 20, 25);
@@ -223,7 +234,7 @@ const ChauffeurDashboard = () => {
       head: [['Description', 'Montant']],
       body: summaryData,
       theme: 'striped',
-      headStyles: { fillColor: [255, 215, 0], textColor: [0, 0, 0], fontStyle: 'bold' },
+      headStyles: { fillColor: [255, 107, 0], textColor: [255, 255, 255], fontStyle: 'bold' },
       styles: { fontSize: 11 },
       columnStyles: {
         0: { cellWidth: 100 },
@@ -250,7 +261,7 @@ const ChauffeurDashboard = () => {
         head: [['N° Commande', 'Date', 'Client', 'Montant']],
         body: coursesData,
         theme: 'striped',
-        headStyles: { fillColor: [255, 215, 0], textColor: [0, 0, 0], fontStyle: 'bold' },
+        headStyles: { fillColor: [255, 107, 0], textColor: [255, 255, 255], fontStyle: 'bold' },
         styles: { fontSize: 9 },
       });
     }
@@ -289,6 +300,7 @@ const ChauffeurDashboard = () => {
 
   // Calculate route with OSRM (OpenStreetMap Routing Machine)
   const calculateRoute = useCallback(async (origin, destination) => {
+    if (!origin || !destination) return;
     try {
       const response = await fetch(
         `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson`
@@ -329,6 +341,9 @@ const ChauffeurDashboard = () => {
       });
     }
   }, []);
+
+  // Keep calculateRoute ref in sync
+  useEffect(() => { calculateRouteRef.current = calculateRoute; }, [calculateRoute]);
 
   // Geolocation tracking
   useEffect(() => {
@@ -392,16 +407,20 @@ const ChauffeurDashboard = () => {
     }
   }, [isOnline, currentCourse, calculateRoute]);
 
-  // Poll for incoming course requests
+  // Poll for incoming course requests - STABLE interval using refs
   useEffect(() => {
     if (!isOnline) return;
 
     const checkForCourses = async () => {
       try {
         const response = await chauffeurApi.getPendingCourse();
+        const curIncoming = incomingRequestRef.current;
+        const curCourse = currentCourseRef.current;
+        const curPosition = positionRef.current;
+        const curCalcRoute = calculateRouteRef.current;
         
         if (response.data.course) {
-          if (response.data.type === 'request' && (!incomingRequest || incomingRequest.id !== response.data.course.id)) {
+          if (response.data.type === 'request' && (!curIncoming || curIncoming.id !== response.data.course.id)) {
             setIncomingRequest(response.data.course);
             setShowIncomingDialog(true);
             if (audioRef.current) {
@@ -413,33 +432,35 @@ const ChauffeurDashboard = () => {
             setIncomingRequest(null);
             setShowIncomingDialog(false);
             
-            // Calculate initial route - uniquement si on a une position réelle
-            if (position) {
+            // Calculate initial route
+            if (curPosition && curCalcRoute) {
               const targetLat = course.status === 'in_progress' ? course.destination_lat : course.pickup_lat;
               const targetLng = course.status === 'in_progress' ? course.destination_lng : course.pickup_lng;
               
-              calculateRoute(
-                { lat: position[0], lng: position[1] },
+              curCalcRoute(
+                { lat: curPosition[0], lng: curPosition[1] },
                 { lat: targetLat, lng: targetLng }
               );
             }
           }
         } else {
-          if (currentCourse?.status === 'completed') {
+          if (curCourse?.status === 'completed') {
             setCurrentCourse(null);
             setRoutePolyline([]);
             setRouteInfo(null);
           }
         }
       } catch (error) {
-        console.error('Error checking courses:', error);
+        // Silent - retry on next poll
       }
     };
 
+    // Initial check immediately
     checkForCourses();
+    // Stable 3-second polling - NOT affected by position changes
     const interval = setInterval(checkForCourses, 3000);
     return () => clearInterval(interval);
-  }, [isOnline, incomingRequest?.id, currentCourse?.status, position, calculateRoute]);
+  }, [isOnline]); // ONLY depends on isOnline - refs handle the rest
 
   // Toggle online status
   const handlePointer = async () => {
@@ -602,19 +623,19 @@ const ChauffeurDashboard = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-[#09090B]">
+    <div className="h-screen flex flex-col bg-[#0A1628]">
       {/* Notification audio */}
       <audio ref={audioRef} src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2JkI+Kd2VfYHOCkJaUiXppaGx8jJiZk4Z2amxwhJKamJKEd29yd4WRmJePgXVxdX+LlZeTi4B2c3h/ipOWk42DenV3fYaPlZKMg3t3eH2EjJGPi4N8eHl9goqOjYmDfXp5fIGHi4qHgn16eXx/hIiIhYF9e3p8f4OGhoOAfXt6fH+ChYWCf317e3x+gYODgX9+fHx8foCCgoB/fnx8fH5/gYGAfn59fX1+f4CAgH9+fX19fn9/f39+fn19fX5+fn5+fn5+fn5+fn5+fn5+fn5+" />
 
       {/* Header */}
-      <header className="flex items-center justify-between p-4 bg-[#09090B] border-b border-zinc-800 z-20">
+      <header className="flex items-center justify-between p-4 bg-[#0A1628] border-b border-[#1A3358] z-20">
         <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="text-white" data-testid="menu-btn">
               <Menu className="w-6 h-6" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="bg-[#18181B] border-zinc-700 w-80">
+          <SheetContent side="left" className="bg-[#0F2240] border-[#1A3358] w-80">
             <SheetHeader>
               <SheetTitle className="text-white flex items-center gap-3">
                 <img src={LOGO_URL} alt="TaxiG" className="h-10" />
@@ -622,15 +643,15 @@ const ChauffeurDashboard = () => {
             </SheetHeader>
             <div className="mt-8 space-y-2">
               {profile && (
-                <div className="p-4 bg-[#09090B] rounded-lg mb-6">
+                <div className="p-4 bg-[#0A1628] rounded-lg mb-6">
                   <p className="text-white font-bold">{profile.prenom} {profile.nom}</p>
-                  <p className="text-zinc-400 text-sm">Code: {profile.code_chauffeur}</p>
-                  <p className="text-zinc-400 text-sm">{profile.nombre_courses} courses effectuées</p>
+                  <p className="text-slate-400 text-sm">Code: {profile.code_chauffeur}</p>
+                  <p className="text-slate-400 text-sm">{profile.nombre_courses} courses effectuées</p>
                 </div>
               )}
               <Button 
                 variant="ghost" 
-                className={`w-full justify-start text-white hover:text-[#FFD700] hover:bg-white/10 ${view === 'map' ? 'text-[#FFD700]' : ''}`}
+                className={`w-full justify-start text-white hover:text-[#FF6B00] hover:bg-white/10 ${view === 'map' ? 'text-[#FF6B00]' : ''}`}
                 onClick={() => handleViewChange('map')}
               >
                 <MapPin className="w-5 h-5 mr-3" />
@@ -638,7 +659,7 @@ const ChauffeurDashboard = () => {
               </Button>
               <Button 
                 variant="ghost" 
-                className={`w-full justify-start text-white hover:text-[#FFD700] hover:bg-white/10 ${view === 'commandes' ? 'text-[#FFD700]' : ''}`}
+                className={`w-full justify-start text-white hover:text-[#FF6B00] hover:bg-white/10 ${view === 'commandes' ? 'text-[#FF6B00]' : ''}`}
                 onClick={() => handleViewChange('commandes')}
               >
                 <Clock className="w-5 h-5 mr-3" />
@@ -646,7 +667,7 @@ const ChauffeurDashboard = () => {
               </Button>
               <Button 
                 variant="ghost" 
-                className={`w-full justify-start text-white hover:text-[#FFD700] hover:bg-white/10 ${view === 'revenus' ? 'text-[#FFD700]' : ''}`}
+                className={`w-full justify-start text-white hover:text-[#FF6B00] hover:bg-white/10 ${view === 'revenus' ? 'text-[#FF6B00]' : ''}`}
                 onClick={() => handleViewChange('revenus')}
               >
                 <DollarSign className="w-5 h-5 mr-3" />
@@ -654,13 +675,13 @@ const ChauffeurDashboard = () => {
               </Button>
               <Button 
                 variant="ghost" 
-                className={`w-full justify-start text-white hover:text-[#FFD700] hover:bg-white/10 ${view === 'calendar' ? 'text-[#FFD700]' : ''}`}
+                className={`w-full justify-start text-white hover:text-[#FF6B00] hover:bg-white/10 ${view === 'calendar' ? 'text-[#FF6B00]' : ''}`}
                 onClick={() => handleViewChange('calendar')}
               >
                 <Calendar className="w-5 h-5 mr-3" />
                 Calendrier
               </Button>
-              <div className="pt-4 border-t border-zinc-700 mt-4">
+              <div className="pt-4 border-t border-[#1A3358] mt-4">
                 <Button 
                   variant="ghost" 
                   className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-500/10"
@@ -679,7 +700,7 @@ const ChauffeurDashboard = () => {
         <Button
           variant="ghost"
           size="icon"
-          className={`${isOnline ? 'text-green-400' : 'text-zinc-500'}`}
+          className={`${isOnline ? 'text-green-400' : 'text-slate-500'}`}
           onClick={handlePointer}
           disabled={loading}
           data-testid="pointer-btn"
@@ -689,9 +710,9 @@ const ChauffeurDashboard = () => {
       </header>
 
       {/* Status bar */}
-      <div className={`px-4 py-2 flex items-center justify-center gap-2 ${isOnline ? 'bg-green-500/20' : 'bg-zinc-800'}`}>
-        <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-zinc-500'}`} />
-        <span className={`text-sm font-medium ${isOnline ? 'text-green-400' : 'text-zinc-400'}`}>
+      <div className={`px-4 py-2 flex items-center justify-center gap-2 ${isOnline ? 'bg-green-500/20' : 'bg-[#0F2240]'}`}>
+        <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-slate-500'}`} />
+        <span className={`text-sm font-medium ${isOnline ? 'text-green-400' : 'text-slate-400'}`}>
           {isOnline ? 'En service' : 'Hors service'}
         </span>
       </div>
@@ -780,23 +801,23 @@ const ChauffeurDashboard = () => {
 
             {/* Route Info Bar - TEMPS RÉEL */}
             {currentCourse && routeInfo && (
-              <div className="absolute top-2 left-2 right-2 bg-white rounded-xl shadow-lg p-4 z-10">
+              <div className="absolute top-2 left-2 right-2 glass-navy rounded-xl shadow-lg p-4 z-10 animate-slideDown">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
+                    <div className="w-12 h-12 bg-[#FF6B00] rounded-full flex items-center justify-center">
                       <Route className="w-6 h-6 text-white" />
                     </div>
                     <div>
                       {/* Temps restant en temps réel */}
-                      <p className="text-black font-bold text-xl">
+                      <p className="text-white font-bold text-xl">
                         {remainingTime !== null ? formatTime(remainingTime) : routeInfo.duration}
                       </p>
-                      <p className="text-gray-500 text-sm">{routeInfo.distance}</p>
+                      <p className="text-slate-400 text-sm">{routeInfo.distance}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-gray-400 text-xs uppercase">Temps écoulé</p>
-                    <p className="text-black font-bold text-2xl font-mono">{formatTime(elapsedTime)}</p>
+                    <p className="text-slate-400 text-xs uppercase">Temps écoulé</p>
+                    <p className="text-[#FF6B00] font-bold text-2xl font-mono">{formatTime(elapsedTime)}</p>
                   </div>
                 </div>
               </div>
@@ -804,18 +825,18 @@ const ChauffeurDashboard = () => {
 
             {/* Course Panel */}
             {currentCourse && (
-              <div className="absolute bottom-0 left-0 right-0 bg-[#18181B] rounded-t-3xl p-6 z-10 shadow-2xl border-t border-zinc-700">
+              <div className="absolute bottom-0 left-0 right-0 bg-[#0F2240] rounded-t-3xl p-6 z-10 shadow-2xl border-t border-[#1A3358]">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <p className="text-zinc-400 text-sm">
+                    <p className="text-slate-400 text-sm">
                       {currentCourse.status === 'assigned' ? '🚗 En route vers le client' : '🏁 En course'}
                     </p>
                     <p className="text-white font-bold">{currentCourse.commande_no}</p>
                   </div>
                   {/* Chrono temps réel */}
                   <div className="flex items-center gap-3">
-                    <div className="bg-[#FFD700]/20 px-4 py-2 rounded-lg">
-                      <p className="text-[#FFD700] font-mono font-bold text-lg">{formatTime(elapsedTime)}</p>
+                    <div className="bg-[#FF6B00]/20 px-4 py-2 rounded-lg">
+                      <p className="text-[#FF6B00] font-mono font-bold text-lg">{formatTime(elapsedTime)}</p>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                       currentCourse.status === 'in_progress' 
@@ -829,41 +850,41 @@ const ChauffeurDashboard = () => {
                 
                 {/* Route info compact */}
                 {routeInfo && (
-                  <div className="flex items-center justify-between mb-4 bg-[#09090B] rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-4 bg-[#0A1628] rounded-lg p-3">
                     <div className="flex items-center gap-4">
                       <div>
-                        <p className="text-zinc-500 text-xs">RESTANT</p>
+                        <p className="text-slate-500 text-xs">RESTANT</p>
                         <p className="text-white font-bold">{remainingTime !== null ? formatTime(remainingTime) : routeInfo.duration}</p>
                       </div>
-                      <div className="w-px h-8 bg-zinc-700" />
+                      <div className="w-px h-8 bg-[#1A3358]" />
                       <div>
-                        <p className="text-zinc-500 text-xs">DISTANCE</p>
+                        <p className="text-slate-500 text-xs">DISTANCE</p>
                         <p className="text-white font-bold">{routeInfo.distance}</p>
                       </div>
                     </div>
                     <div>
-                      <p className="text-zinc-500 text-xs">ETA</p>
-                      <p className="text-[#FFD700] font-bold text-xl">{routeInfo.eta}</p>
+                      <p className="text-slate-500 text-xs">ETA</p>
+                      <p className="text-[#FF6B00] font-bold text-xl">{routeInfo.eta}</p>
                     </div>
                   </div>
                 )}
                 
                 {/* Route visualization */}
-                <div className="bg-[#09090B] rounded-lg p-4 mb-4">
+                <div className="bg-[#0A1628] rounded-lg p-4 mb-4">
                   <div className="flex items-start gap-3">
                     <div className="flex flex-col items-center">
                       <div className="w-3 h-3 bg-blue-500 rounded-full" />
-                      <div className="w-0.5 h-8 bg-zinc-600" />
+                      <div className="w-0.5 h-8 bg-[#1A3358]/50" />
                       <div className="w-3 h-3 bg-green-500 rounded-full" />
                     </div>
                     <div className="flex-1 space-y-4">
                       <div>
-                        <p className="text-zinc-500 text-xs">PRISE EN CHARGE</p>
+                        <p className="text-slate-500 text-xs">PRISE EN CHARGE</p>
                         <p className="text-white text-sm">{currentCourse.pickup_address}</p>
                         <p className="text-blue-400 text-xs font-bold">👤 {currentCourse.client_nom}</p>
                       </div>
                       <div>
-                        <p className="text-zinc-500 text-xs">DESTINATION</p>
+                        <p className="text-slate-500 text-xs">DESTINATION</p>
                         <p className="text-white text-sm">{currentCourse.destination_address}</p>
                       </div>
                     </div>
@@ -877,19 +898,19 @@ const ChauffeurDashboard = () => {
                       <Timer className="w-5 h-5 text-blue-400" />
                       <div>
                         <p className="text-blue-400 font-bold">{routeInfo.duration}</p>
-                        <p className="text-zinc-400 text-xs">{routeInfo.distance}</p>
+                        <p className="text-slate-400 text-xs">{routeInfo.distance}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-zinc-400 text-xs">ETA</p>
+                      <p className="text-slate-400 text-xs">ETA</p>
                       <p className="text-white font-bold text-lg">{routeInfo.eta}</p>
                     </div>
                   </div>
                 )}
                 
                 <div className="flex justify-between items-center mb-4">
-                  <span className="text-zinc-400">{currentCourse.distance_km?.toFixed(1)} km</span>
-                  <span className="text-[#FFD700] font-bold text-xl">{currentCourse.prix_estime?.toFixed(2)}€</span>
+                  <span className="text-slate-400">{currentCourse.distance_km?.toFixed(1)} km</span>
+                  <span className="text-[#FF6B00] font-bold text-xl">{currentCourse.prix_estime?.toFixed(2)}€</span>
                 </div>
                 
                 {currentCourse.status === 'assigned' ? (
@@ -916,20 +937,20 @@ const ChauffeurDashboard = () => {
 
             {/* Waiting message */}
             {!currentCourse && isOnline && (
-              <div className="absolute bottom-0 left-0 right-0 bg-[#18181B] rounded-t-3xl p-6 z-10">
+              <div className="absolute bottom-0 left-0 right-0 bg-[#0F2240] rounded-t-3xl p-6 z-10">
                 <div className="text-center py-4">
-                  <MapPin className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-                  <p className="text-zinc-400">En attente d'une course...</p>
+                  <MapPin className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                  <p className="text-slate-400">En attente d'une course...</p>
                 </div>
               </div>
             )}
 
             {/* Offline message */}
             {!isOnline && (
-              <div className="absolute bottom-0 left-0 right-0 bg-[#18181B] rounded-t-3xl p-6 z-10">
+              <div className="absolute bottom-0 left-0 right-0 bg-[#0F2240] rounded-t-3xl p-6 z-10">
                 <div className="text-center py-4">
-                  <Power className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-                  <p className="text-zinc-400">Vous êtes hors service</p>
+                  <Power className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                  <p className="text-slate-400">Vous êtes hors service</p>
                   <Button 
                     className="btn-taxi mt-4"
                     onClick={handlePointer}
@@ -954,7 +975,7 @@ const ChauffeurDashboard = () => {
                 <Button
                   key={filter}
                   variant={commandeFilter === filter ? 'default' : 'outline'}
-                  className={commandeFilter === filter ? 'btn-taxi' : 'border-zinc-700 text-white'}
+                  className={commandeFilter === filter ? 'btn-taxi' : 'border-[#1A3358] text-white'}
                   onClick={() => { setCommandeFilter(filter); fetchCommandes(); }}
                 >
                   {filter === 'all' ? 'Toutes' : filter === 'completed' ? 'Terminées' : 'Assignées'}
@@ -966,15 +987,15 @@ const ChauffeurDashboard = () => {
               <div className="space-y-4">
                 {[1,2,3].map(i => (
                   <div key={i} className="card-taxi p-4 animate-pulse">
-                    <div className="h-4 bg-zinc-700 rounded w-3/4 mb-2" />
-                    <div className="h-4 bg-zinc-700 rounded w-1/2" />
+                    <div className="h-4 bg-[#1A3358] rounded w-3/4 mb-2" />
+                    <div className="h-4 bg-[#1A3358] rounded w-1/2" />
                   </div>
                 ))}
               </div>
             ) : commandes.length === 0 ? (
               <div className="text-center py-12">
-                <Clock className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
-                <p className="text-zinc-400">Aucune commande</p>
+                <Clock className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                <p className="text-slate-400">Aucune commande</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -983,7 +1004,7 @@ const ChauffeurDashboard = () => {
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <p className="text-white font-bold">{commande.commande_no}</p>
-                        <p className="text-zinc-400 text-sm">{commande.client_nom}</p>
+                        <p className="text-slate-400 text-sm">{commande.client_nom}</p>
                       </div>
                       <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                         commande.status === 'completed' ? 'badge-success' : 'badge-info'
@@ -991,11 +1012,11 @@ const ChauffeurDashboard = () => {
                         {commande.status === 'completed' ? 'Terminée' : 'Assignée'}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center mt-3 pt-3 border-t border-zinc-700">
-                      <span className="text-zinc-400 text-sm">
+                    <div className="flex justify-between items-center mt-3 pt-3 border-t border-[#1A3358]">
+                      <span className="text-slate-400 text-sm">
                         {new Date(commande.created_at).toLocaleDateString('fr-FR')}
                       </span>
-                      <span className="text-[#FFD700] font-bold">{commande.prix?.toFixed(2)}€</span>
+                      <span className="text-[#FF6B00] font-bold">{commande.prix?.toFixed(2)}€</span>
                     </div>
                   </div>
                 ))}
@@ -1011,7 +1032,7 @@ const ChauffeurDashboard = () => {
               <h2 className="text-2xl font-bold text-white">Mes revenus</h2>
               {revenus && (
                 <Button 
-                  className="bg-[#FFD700] hover:bg-[#FFD700]/90 text-black font-bold flex items-center gap-2"
+                  className="bg-[#FF6B00] hover:bg-[#FF6B00]/90 text-black font-bold flex items-center gap-2"
                   onClick={exportRevenusPDF}
                   data-testid="export-pdf-btn"
                 >
@@ -1023,23 +1044,23 @@ const ChauffeurDashboard = () => {
             
             {!revenus ? (
               <div className="text-center py-12">
-                <DollarSign className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
+                <DollarSign className="w-16 h-16 text-slate-600 mx-auto mb-4" />
                 <Button className="btn-taxi" onClick={fetchRevenus}>Charger les revenus</Button>
               </div>
             ) : (
               <div className="space-y-6">
                 {/* Export Banner */}
-                <div className="bg-gradient-to-r from-[#FFD700]/20 to-transparent border border-[#FFD700]/30 rounded-xl p-4 flex items-center gap-4">
-                  <div className="w-12 h-12 bg-[#FFD700]/20 rounded-full flex items-center justify-center">
-                    <FileText className="w-6 h-6 text-[#FFD700]" />
+                <div className="bg-gradient-to-r from-[#FF6B00]/20 to-transparent border border-[#FF6B00]/30 rounded-xl p-4 flex items-center gap-4">
+                  <div className="w-12 h-12 bg-[#FF6B00]/20 rounded-full flex items-center justify-center">
+                    <FileText className="w-6 h-6 text-[#FF6B00]" />
                   </div>
                   <div className="flex-1">
                     <p className="text-white font-bold">Export Comptabilité</p>
-                    <p className="text-zinc-400 text-sm">Téléchargez vos revenus en PDF pour votre comptable</p>
+                    <p className="text-slate-400 text-sm">Téléchargez vos revenus en PDF pour votre comptable</p>
                   </div>
                   <Button 
                     variant="outline"
-                    className="border-[#FFD700] text-[#FFD700] hover:bg-[#FFD700]/10"
+                    className="border-[#FFD700] text-[#FF6B00] hover:bg-[#FF6B00]/10"
                     onClick={exportRevenusPDF}
                   >
                     <Download className="w-4 h-4 mr-2" />
@@ -1047,39 +1068,39 @@ const ChauffeurDashboard = () => {
                   </Button>
                 </div>
                 
-                <div className="card-taxi p-6 border-[#FFD700]/30">
-                  <p className="text-zinc-400 text-sm">Revenus brut (30 jours)</p>
-                  <p className="text-[#FFD700] text-4xl font-black">{revenus.revenus_brut_30j?.toFixed(2)}€</p>
+                <div className="card-taxi p-6 border-[#FF6B00]/30">
+                  <p className="text-slate-400 text-sm">Revenus brut (30 jours)</p>
+                  <p className="text-[#FF6B00] text-4xl font-black">{revenus.revenus_brut_30j?.toFixed(2)}€</p>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="card-taxi p-4">
-                    <p className="text-zinc-400 text-sm">Net</p>
+                    <p className="text-slate-400 text-sm">Net</p>
                     <p className="text-white text-2xl font-bold">{revenus.revenus_net_30j?.toFixed(2)}€</p>
                   </div>
                   <div className="card-taxi p-4">
-                    <p className="text-zinc-400 text-sm">Commission TaxiG</p>
+                    <p className="text-slate-400 text-sm">Commission TaxiG</p>
                     <p className="text-red-400 text-2xl font-bold">-{revenus.commission_due?.toFixed(2)}€</p>
                   </div>
                 </div>
                 
                 <div className="card-taxi p-4">
-                  <p className="text-zinc-400 text-sm">Nombre de courses</p>
+                  <p className="text-slate-400 text-sm">Nombre de courses</p>
                   <p className="text-white text-2xl font-bold">{revenus.nombre_courses_30j}</p>
                 </div>
                 
                 {/* Courses detail list */}
                 {revenusDetails.length > 0 && (
                   <div className="card-taxi p-4">
-                    <p className="text-zinc-400 text-sm mb-4">Dernières courses complétées</p>
+                    <p className="text-slate-400 text-sm mb-4">Dernières courses complétées</p>
                     <div className="space-y-3 max-h-60 overflow-y-auto">
                       {revenusDetails.slice(0, 10).map((course) => (
-                        <div key={course.id} className="flex justify-between items-center py-2 border-b border-zinc-700/50 last:border-0">
+                        <div key={course.id} className="flex justify-between items-center py-2 border-b border-[#1A3358]/50 last:border-0">
                           <div>
                             <p className="text-white text-sm font-medium">{course.commande_no}</p>
-                            <p className="text-zinc-500 text-xs">{new Date(course.created_at).toLocaleDateString('fr-FR')}</p>
+                            <p className="text-slate-500 text-xs">{new Date(course.created_at).toLocaleDateString('fr-FR')}</p>
                           </div>
-                          <p className="text-[#FFD700] font-bold">{course.prix?.toFixed(2)}€</p>
+                          <p className="text-[#FF6B00] font-bold">{course.prix?.toFixed(2)}€</p>
                         </div>
                       ))}
                     </div>
@@ -1094,7 +1115,7 @@ const ChauffeurDashboard = () => {
         {view === 'calendar' && (
           <div className="p-6 overflow-y-auto h-full">
             <h2 className="text-2xl font-bold text-white mb-2">Calendrier</h2>
-            <p className="text-zinc-400 mb-6">Indiquez vos indisponibilités</p>
+            <p className="text-slate-400 mb-6">Indiquez vos indisponibilités</p>
             
             <div className="card-taxi p-4 flex justify-center">
               <CalendarComponent
@@ -1114,10 +1135,10 @@ const ChauffeurDashboard = () => {
 
       {/* Incoming Course Dialog */}
       <Dialog open={showIncomingDialog} onOpenChange={setShowIncomingDialog}>
-        <DialogContent className="bg-[#18181B] border-zinc-700 max-w-sm mx-4">
+        <DialogContent className="bg-[#0F2240] border-[#1A3358] max-w-sm mx-4 incoming-call-animation">
           <DialogHeader>
-            <DialogTitle className="text-white text-center text-2xl">🚕 Nouvelle course !</DialogTitle>
-            <DialogDescription className="text-zinc-400 text-center">
+            <DialogTitle className="text-white text-center text-2xl">Nouvelle course !</DialogTitle>
+            <DialogDescription className="text-slate-400 text-center">
               Un client vous demande
             </DialogDescription>
           </DialogHeader>
@@ -1125,11 +1146,11 @@ const ChauffeurDashboard = () => {
           {incomingRequest && (
             <div className="py-6">
               <div className="text-center mb-6">
-                <p className="text-[#FFD700] text-4xl font-black">{incomingRequest.prix_estime?.toFixed(2)}€</p>
-                <p className="text-zinc-400 text-sm">{incomingRequest.commande_no}</p>
+                <p className="text-[#FF6B00] text-4xl font-black">{incomingRequest.prix_estime?.toFixed(2)}&euro;</p>
+                <p className="text-slate-400 text-sm">{incomingRequest.commande_no}</p>
               </div>
               
-              <div className="space-y-3 mb-6 bg-[#09090B] p-4 rounded-lg">
+              <div className="space-y-3 mb-6 bg-[#0A1628] p-4 rounded-lg">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-blue-500 rounded-full" />
                   <span className="text-white text-sm">{incomingRequest.pickup_address}</span>
@@ -1140,8 +1161,8 @@ const ChauffeurDashboard = () => {
                 </div>
               </div>
               
-              <p className="text-zinc-400 text-center text-sm mb-6">
-                👤 <span className="text-white font-bold">{incomingRequest.client_nom}</span>
+              <p className="text-slate-400 text-center text-sm mb-6">
+                <span className="text-white font-bold">{incomingRequest.client_nom}</span>
               </p>
               
               <div className="flex gap-4">
@@ -1155,7 +1176,7 @@ const ChauffeurDashboard = () => {
                   Refuser
                 </Button>
                 <Button
-                  className="flex-1 h-14 bg-green-500 hover:bg-green-600 text-white font-bold"
+                  className="flex-1 h-14 btn-taxi"
                   onClick={() => handleRespondToCourse(true)}
                   disabled={loading}
                   data-testid="accept-course-btn"
