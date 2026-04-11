@@ -396,14 +396,27 @@ async def register_chauffeur(chauffeur_data: ChauffeurRegister):
 @api_router.post("/chauffeur/login", response_model=dict)
 async def login_chauffeur(login_data: ChauffeurLogin):
     chauffeur = await db.chauffeurs.find_one({"code_chauffeur": login_data.code_chauffeur}, {"_id": 0})
-    if not chauffeur or not verify_password(login_data.password, chauffeur["password"]):
+    
+    # Debug log
+    import logging
+    logging.info(f"Login attempt for {login_data.code_chauffeur}: found={chauffeur is not None}")
+    if chauffeur:
+        logging.info(f"  -> id={chauffeur.get('id')}, nom={chauffeur.get('prenom')} {chauffeur.get('nom')}")
+    
+    if not chauffeur:
         raise HTTPException(status_code=401, detail="Code ou mot de passe incorrect")
     
-    token = create_token({"sub": chauffeur["id"], "type": "chauffeur", "code": chauffeur["code_chauffeur"]})
+    # Check password (support both 'password' and 'hashed_password' fields)
+    stored_password = chauffeur.get("password") or chauffeur.get("hashed_password")
+    if not stored_password or not verify_password(login_data.password, stored_password):
+        raise HTTPException(status_code=401, detail="Code ou mot de passe incorrect")
+    
+    chauffeur_id = chauffeur.get("id") or chauffeur.get("code_chauffeur")
+    token = create_token({"sub": chauffeur_id, "type": "chauffeur", "code": chauffeur["code_chauffeur"]})
     return {"access_token": token, "token_type": "bearer", "user": {
-        "id": chauffeur["id"],
-        "nom": chauffeur["nom"],
-        "prenom": chauffeur["prenom"],
+        "id": chauffeur_id,
+        "nom": chauffeur.get("nom", ""),
+        "prenom": chauffeur.get("prenom", ""),
         "code_chauffeur": chauffeur["code_chauffeur"]
     }}
 
@@ -412,23 +425,28 @@ async def pointer_chauffeur(user=Depends(get_current_user)):
     if user.get("type") != "chauffeur":
         raise HTTPException(status_code=403, detail="Accès non autorisé")
     
-    chauffeur = await db.chauffeurs.find_one({"id": user["sub"]}, {"_id": 0})
+    # Support both id and code_chauffeur
+    chauffeur = await db.chauffeurs.find_one(
+        {"$or": [{"id": user["sub"]}, {"code_chauffeur": user.get("code")}]}, 
+        {"_id": 0}
+    )
     if not chauffeur:
         raise HTTPException(status_code=404, detail="Chauffeur non trouvé")
     
+    chauffeur_id = chauffeur.get("id") or chauffeur.get("code_chauffeur")
     new_status = not chauffeur.get("is_online", False)
     action = "start" if new_status else "end"
     
     await db.chauffeurs.update_one(
-        {"id": user["sub"]},
-        {"$set": {"is_online": new_status}}
+        {"$or": [{"id": chauffeur_id}, {"code_chauffeur": user.get("code")}]},
+        {"$set": {"is_online": new_status, "status": "online" if new_status else "offline"}}
     )
     
     # Log pointage
     pointage_doc = {
         "id": str(uuid.uuid4()),
-        "chauffeur_id": user["sub"],
-        "chauffeur_nom": f"{chauffeur['prenom']} {chauffeur['nom']}",
+        "chauffeur_id": chauffeur_id,
+        "chauffeur_nom": f"{chauffeur.get('prenom', '')} {chauffeur.get('nom', '')}",
         "action": action,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
@@ -439,7 +457,7 @@ async def pointer_chauffeur(user=Depends(get_current_user)):
     if action == "end":
         today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         courses_today = await db.chauffeur_commandes.find({
-            "chauffeur_id": user["sub"],
+            "chauffeur_id": chauffeur_id,
             "status": "completed",
             "completed_at": {"$gte": today_start.isoformat()}
         }, {"_id": 0}).to_list(100)
@@ -458,8 +476,9 @@ async def update_chauffeur_position(position: ChauffeurPosition, user=Depends(ge
     if user.get("type") != "chauffeur":
         raise HTTPException(status_code=403, detail="Accès non autorisé")
     
+    # Support both id and code_chauffeur
     await db.chauffeurs.update_one(
-        {"id": user["sub"]},
+        {"$or": [{"id": user["sub"]}, {"code_chauffeur": user.get("code")}]},
         {"$set": {"position": {"lat": position.latitude, "lng": position.longitude, "updated_at": datetime.now(timezone.utc).isoformat()}}}
     )
     return {"status": "updated"}
@@ -469,7 +488,11 @@ async def get_chauffeur_profile(user=Depends(get_current_user)):
     if user.get("type") != "chauffeur":
         raise HTTPException(status_code=403, detail="Accès non autorisé")
     
-    chauffeur = await db.chauffeurs.find_one({"id": user["sub"]}, {"_id": 0, "password": 0})
+    # Support both id formats
+    chauffeur = await db.chauffeurs.find_one(
+        {"$or": [{"id": user["sub"]}, {"code_chauffeur": user.get("code")}]}, 
+        {"_id": 0, "password": 0, "hashed_password": 0}
+    )
     if not chauffeur:
         raise HTTPException(status_code=404, detail="Chauffeur non trouvé")
     return chauffeur
@@ -528,14 +551,19 @@ async def get_pending_course(user=Depends(get_current_user)):
     if user.get("type") != "chauffeur":
         raise HTTPException(status_code=403, detail="Accès non autorisé")
     
-    # Check if chauffeur is online
-    chauffeur = await db.chauffeurs.find_one({"id": user["sub"]}, {"_id": 0})
+    # Check if chauffeur is online - support both id and code
+    chauffeur = await db.chauffeurs.find_one(
+        {"$or": [{"id": user["sub"]}, {"code_chauffeur": user.get("code")}]}, 
+        {"_id": 0}
+    )
     if not chauffeur or not chauffeur.get("is_online"):
         return {"course": None}
     
+    chauffeur_id = chauffeur.get("id") or chauffeur.get("code_chauffeur")
+    
     # Check for assigned course
     course = await db.client_commandes.find_one({
-        "chauffeur_id": user["sub"],
+        "chauffeur_id": chauffeur_id,
         "status": {"$in": ["assigned", "in_progress"]}
     }, {"_id": 0})
     
@@ -544,7 +572,7 @@ async def get_pending_course(user=Depends(get_current_user)):
     
     # Check for pending course request
     pending = await db.course_requests.find_one({
-        "target_chauffeur_id": user["sub"],
+        "target_chauffeur_id": chauffeur_id,
         "status": "pending"
     }, {"_id": 0})
     
@@ -562,7 +590,11 @@ async def respond_to_course(request_id: str, accept: bool, user=Depends(get_curr
     if not request_doc:
         raise HTTPException(status_code=404, detail="Demande non trouvée")
     
-    chauffeur = await db.chauffeurs.find_one({"id": user["sub"]}, {"_id": 0})
+    chauffeur = await db.chauffeurs.find_one(
+        {"$or": [{"id": user["sub"]}, {"code_chauffeur": user.get("code")}]}, 
+        {"_id": 0}
+    )
+    chauffeur_id = chauffeur.get("id") or chauffeur.get("code_chauffeur")
     
     if accept:
         # Accept the course
@@ -575,8 +607,8 @@ async def respond_to_course(request_id: str, accept: bool, user=Depends(get_curr
         await db.client_commandes.update_one(
             {"id": request_doc["course_id"]},
             {"$set": {
-                "chauffeur_id": user["sub"],
-                "chauffeur_nom": f"{chauffeur['prenom']} {chauffeur['nom']}",
+                "chauffeur_id": chauffeur_id,
+                "chauffeur_nom": f"{chauffeur.get('prenom', '')} {chauffeur.get('nom', '')}",
                 "status": "assigned"
             }}
         )
@@ -584,7 +616,7 @@ async def respond_to_course(request_id: str, accept: bool, user=Depends(get_curr
         # Create chauffeur commande entry
         await db.chauffeur_commandes.insert_one({
             "id": str(uuid.uuid4()),
-            "chauffeur_id": user["sub"],
+            "chauffeur_id": chauffeur_id,
             "commande_no": request_doc["commande_no"],
             "course_id": request_doc["course_id"],
             "client_nom": request_doc["client_nom"],
@@ -598,7 +630,7 @@ async def respond_to_course(request_id: str, accept: bool, user=Depends(get_curr
         # Reject - find next closest driver
         await db.course_requests.update_one(
             {"id": request_id},
-            {"$set": {"status": "rejected", "rejected_by": user["sub"]}}
+            {"$set": {"status": "rejected", "rejected_by": chauffeur_id}}
         )
         
         # Get rejected chauffeurs for this course
@@ -607,7 +639,7 @@ async def respond_to_course(request_id: str, accept: bool, user=Depends(get_curr
             "status": "rejected"
         }, {"_id": 0}).to_list(100)
         rejected_ids = [r.get("target_chauffeur_id") for r in rejected]
-        rejected_ids.append(user["sub"])
+        rejected_ids.append(chauffeur_id)
         
         # Find next available chauffeur
         course = await db.client_commandes.find_one({"id": request_doc["course_id"]}, {"_id": 0})
