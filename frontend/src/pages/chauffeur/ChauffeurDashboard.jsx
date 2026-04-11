@@ -18,7 +18,6 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import 'leaflet/dist/leaflet.css';
 
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 const LOGO_URL = "https://customer-assets.emergentagent.com/job_geolocab-platform/artifacts/6p3uaynm_1000103457-removebg-preview.png";
 
 // Chauffeur location icon (yellow car)
@@ -272,16 +271,6 @@ const ChauffeurDashboard = () => {
     toast.success('PDF téléchargé avec succès !');
   }, [revenus, profile, revenusDetails]);
 
-  // Load Google Maps script
-  useEffect(() => {
-    if (window.google && window.google.maps) return;
-    
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`;
-    script.async = true;
-    document.head.appendChild(script);
-  }, []);
-
   // Fetch profile
   const fetchProfile = useCallback(async () => {
     try {
@@ -290,7 +279,7 @@ const ChauffeurDashboard = () => {
       setIsOnline(response.data.is_online);
       setIndisponibilites(response.data.indisponibilites || []);
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      // Silent error
     }
   }, []);
 
@@ -298,55 +287,37 @@ const ChauffeurDashboard = () => {
     fetchProfile();
   }, [fetchProfile]);
 
-  // Calculate route with Google Directions
+  // Calculate route with OSRM (OpenStreetMap Routing Machine)
   const calculateRoute = useCallback(async (origin, destination) => {
-    
-    if (!window.google || !window.google.maps) {
-      console.warn('Google Maps API not available, using straight line');
-      // Fallback: create simple straight line
-      setRoutePolyline([[origin.lat, origin.lng], [destination.lat, destination.lng]]);
-      return;
-    }
-    
-    const directionsService = new window.google.maps.DirectionsService();
-    
     try {
-      const result = await new Promise((resolve, reject) => {
-        directionsService.route({
-          origin: { lat: origin.lat, lng: origin.lng },
-          destination: { lat: destination.lat, lng: destination.lng },
-          travelMode: window.google.maps.TravelMode.DRIVING
-        }, (res, status) => {
-          if (status === 'OK') resolve(res);
-          else reject(status);
-        });
-      });
+      const response = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson`
+      );
+      const data = await response.json();
       
-      if (result.routes[0]) {
-        const route = result.routes[0];
-        const leg = route.legs[0];
+      if (data.routes && data.routes[0]) {
+        const route = data.routes[0];
         
-        // Decode the polyline - overview_polyline is an object with 'points' property
-        const encodedPolyline = route.overview_polyline.points || route.overview_polyline;
-        
-        const polyline = decodePolyline(encodedPolyline);
-        setRoutePolyline(polyline);
+        // Extract coordinates from GeoJSON
+        const coordinates = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+        setRoutePolyline(coordinates);
         
         // Calculate ETA
         const now = new Date();
-        const eta = new Date(now.getTime() + leg.duration.value * 1000);
+        const eta = new Date(now.getTime() + route.duration * 1000);
         
         setRouteInfo({
-          distance: leg.distance.text,
-          distanceValue: leg.distance.value / 1000, // km
-          duration: leg.duration.text,
-          durationValue: leg.duration.value / 60, // minutes
+          distance: `${(route.distance / 1000).toFixed(1)} km`,
+          distanceValue: route.distance / 1000,
+          duration: `${Math.round(route.duration / 60)} min`,
+          durationValue: route.duration / 60,
           eta: eta.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
         });
-        
+      } else {
+        // Fallback to straight line
+        setRoutePolyline([[origin.lat, origin.lng], [destination.lat, destination.lng]]);
       }
     } catch (error) {
-      console.error('Route calculation error:', error);
       // Fallback to straight line
       setRoutePolyline([[origin.lat, origin.lng], [destination.lat, destination.lng]]);
       setRouteInfo({

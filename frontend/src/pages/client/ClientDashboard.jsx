@@ -14,7 +14,6 @@ import { clientApi, courseApi, publicApi, paymentApi } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import 'leaflet/dist/leaflet.css';
 
-const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 const LOGO_URL = "https://customer-assets.emergentagent.com/job_geolocab-platform/artifacts/6p3uaynm_1000103457-removebg-preview.png";
 
 // Fix Leaflet icon issue
@@ -231,39 +230,34 @@ const ClientDashboard = () => {
       });
     };
     
+    // Reverse geocoding with Nominatim (OpenStreetMap)
+    const reverseGeocode = async (lat, lng) => {
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+        );
+        const data = await response.json();
+        return data.display_name || 'Ma position actuelle';
+      } catch {
+        return 'Ma position actuelle';
+      }
+    };
+    
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
           const pos = [position.coords.latitude, position.coords.longitude];
           setUserPosition(pos);
           setMapCenter(pos);
-          if (window.google && window.google.maps) {
-            const geocoder = new window.google.maps.Geocoder();
-            geocoder.geocode({ location: { lat: position.coords.latitude, lng: position.coords.longitude } }, (results, status) => {
-              if (status === 'OK' && results[0]) {
-                setPickup({
-                  address: results[0].formatted_address,
-                  lat: position.coords.latitude,
-                  lng: position.coords.longitude
-                });
-              } else {
-                setPickup({
-                  address: 'Ma position actuelle',
-                  lat: position.coords.latitude,
-                  lng: position.coords.longitude
-                });
-              }
-            });
-          } else {
-            setPickup({
-              address: 'Ma position actuelle',
-              lat: position.coords.latitude,
-              lng: position.coords.longitude
-            });
-          }
+          
+          const address = await reverseGeocode(position.coords.latitude, position.coords.longitude);
+          setPickup({
+            address: address,
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
         },
         (error) => {
-          console.error('Geolocation error:', error);
           // Fallback to default Geneva position
           setDefaultPosition();
           toast.info('Position par défaut: Genève');
@@ -369,30 +363,23 @@ const ClientDashboard = () => {
     
     setLoading(true);
     
+    // Calculate distance using Haversine formula
     let distance = calculateDistance(pickup.lat, pickup.lng, destination.lat, destination.lng);
+    // Estimate duration: ~2.5 min per km in city
     let duration = distance * 2.5;
     
-    if (window.google && window.google.maps) {
-      try {
-        const directionsService = new window.google.maps.DirectionsService();
-        const result = await new Promise((resolve, reject) => {
-          directionsService.route({
-            origin: { lat: pickup.lat, lng: pickup.lng },
-            destination: { lat: destination.lat, lng: destination.lng },
-            travelMode: window.google.maps.TravelMode.DRIVING
-          }, (res, status) => {
-            if (status === 'OK') resolve(res);
-            else reject(status);
-          });
-        });
-        
-        if (result.routes[0]?.legs[0]) {
-          distance = result.routes[0].legs[0].distance.value / 1000;
-          duration = result.routes[0].legs[0].duration.value / 60;
-        }
-      } catch (error) {
-        console.warn('Directions API error, using fallback calculation:', error);
+    // Try to get better route estimate using OSRM (OpenStreetMap Routing)
+    try {
+      const response = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${pickup.lng},${pickup.lat};${destination.lng},${destination.lat}?overview=false`
+      );
+      const data = await response.json();
+      if (data.routes && data.routes[0]) {
+        distance = data.routes[0].distance / 1000; // meters to km
+        duration = data.routes[0].duration / 60; // seconds to minutes
       }
+    } catch {
+      // Use fallback calculation (already set above)
     }
     
     try {
