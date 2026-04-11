@@ -166,6 +166,20 @@ const ClientDashboard = () => {
 
   // Get user geolocation
   useEffect(() => {
+    // Default position: Geneva center (where test drivers are located)
+    const defaultPosition = { lat: 46.2044, lng: 6.1432 };
+    
+    const setDefaultPosition = () => {
+      const pos = [defaultPosition.lat, defaultPosition.lng];
+      setUserPosition(pos);
+      setMapCenter(pos);
+      setPickup({
+        address: 'Gare de Genève-Cornavin, Genève, Suisse',
+        lat: defaultPosition.lat,
+        lng: defaultPosition.lng
+      });
+    };
+    
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -199,12 +213,15 @@ const ClientDashboard = () => {
         },
         (error) => {
           console.error('Geolocation error:', error);
-          toast.error('Impossible d\'obtenir votre position. Activez la géolocalisation.');
+          // Fallback to default Geneva position
+          setDefaultPosition();
+          toast.info('Position par défaut: Genève');
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
       );
     } else {
-      toast.error('Géolocalisation non supportée par votre navigateur');
+      setDefaultPosition();
+      toast.info('Position par défaut: Genève');
     }
   }, []);
 
