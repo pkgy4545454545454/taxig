@@ -4,9 +4,9 @@
 Build a complete taxi application called "TaxiG" with three-sided platform for clients, drivers, and administrator.
 
 ## Core Requirements
-- **Client App:** Registration/login, map view, pickup/destination inputs, price estimation, booking, ride tracking, history
-- **Driver App:** Login with code, online/offline status, real-time requests, accept/reject, route map, revenue export PDF
-- **Admin Dashboard:** Platform statistics, driver/client management, ride monitoring
+- **Client App:** Registration/login, map view, pickup/destination inputs, price estimation, booking, ride tracking, history, rating
+- **Driver App:** Login with code, online/offline status, real-time requests with browser notifications, accept/reject, route map, revenue export PDF, document upload, rating
+- **Admin Dashboard:** Platform statistics, driver/client management, ride monitoring, document verification
 - **Design:** "Bleu marine + Orange (EasyJet)" visual theme
 
 ## Tech Stack
@@ -15,12 +15,9 @@ Build a complete taxi application called "TaxiG" with three-sided platform for c
 - Maps: OpenStreetMap (Nominatim geocoding, OSRM routing) - NO Google Maps
 - Payments: Stripe (currently broken/expired key)
 
-## User Personas
-1. **Client** - Books rides, tracks drivers, views history
-2. **Chauffeur (Driver)** - Goes online, receives ride requests, navigates, earns revenue
-3. **Admin** - Manages platform, views stats, manages drivers/clients
+## What's Been Implemented
 
-## What's Been Implemented (Completed)
+### Phase 1 - Core Platform (Complete)
 - Full 3-dashboard application (Client, Driver, Admin)
 - JWT authentication for all user types
 - OpenStreetMap integration (Nominatim + OSRM + Leaflet)
@@ -29,22 +26,32 @@ Build a complete taxi application called "TaxiG" with three-sided platform for c
 - Roulette promo system for clients
 - Driver calendar/availability management
 - Admin stats, driver/client management, course monitoring
-- "Bleu Marine + Orange" theme applied to ALL pages (including ChauffeurDashboard)
-- Fixed driver notification polling (stable 3s interval using useRef)
-- Fixed dual-database bug (taxi vs taxig)
+
+### Phase 2 - UI Redesign (Complete)
+- "Bleu Marine + Orange" theme applied to ALL pages
 - Removed Google Maps, PostHog, debug logs
+- Fixed dual-database bug (taxi vs taxig)
+
+### Phase 3 - Real-time & New Features (Complete - Apr 2026)
+- Fixed driver notification polling (stable 3s interval using useRef)
+- Browser push notifications (Web Notifications API) for drivers
+- 5-star rating system (client rates driver, driver rates client)
+- Document upload for drivers (permis de conduire, permis de séjour, pièce d'identité)
+- Admin document verification (approve/reject)
+- Comprehensive testing: 4 booking tests with multiple drivers
 
 ## Credentials
 - Client: jean.dupont@test.com / test123
 - Driver: TAXI001 / chauffeur123 (Jean Martin)
+- Driver: TEST002 / test123
+- Driver: TEST003 / test123
+- Driver: TEST004 / test123
 - Admin: naim / admin123
 
 ## Prioritized Backlog
 ### P1 - Next Tasks
 - Stripe payment integration (needs valid API key)
-- Browser push notifications for drivers
 
 ### P2 - Future Tasks
-- 5-star rating system (client/driver)
-- Driver document image upload
 - File refactoring (large dashboard components >1000 lines)
+- Service Worker for offline push notifications
