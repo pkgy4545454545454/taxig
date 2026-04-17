@@ -107,4 +107,11 @@ export const paymentApi = {
   getStatus: (sessionId) => api.get(`/payment/status/${sessionId}`),
 };
 
+// Chat API
+export const chatApi = {
+  send: (courseId, message) => api.post(`/chat/${courseId}/send`, { message }),
+  getMessages: (courseId, after) => api.get(`/chat/${courseId}/messages`, { params: { after } }),
+  getUnread: (courseId) => api.get(`/chat/${courseId}/unread`),
+};
+
 export default api;

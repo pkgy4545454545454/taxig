@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { toast } from 'sonner';
 import { courseApi, paymentApi } from '../../lib/api';
+import ChatPanel, { ChatToggleButton } from '../../components/ChatPanel';
 import 'leaflet/dist/leaflet.css';
 
 const LOGO_URL = "https://customer-assets.emergentagent.com/job_geolocab-platform/artifacts/6p3uaynm_1000103457-removebg-preview.png";
@@ -62,6 +63,9 @@ const ClientCourse = () => {
   const [ratingHover, setRatingHover] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
   const [hasRated, setHasRated] = useState(false);
+  
+  // Chat state
+  const [chatOpen, setChatOpen] = useState(false);
 
   // Check payment status on mount
   useEffect(() => {
@@ -285,9 +289,9 @@ const ClientCourse = () => {
               <Button variant="ghost" size="icon" className="text-white hover:text-[#FF6B00]">
                 <Phone className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="icon" className="text-white hover:text-[#FF6B00]">
-                <MessageSquare className="w-5 h-5" />
-              </Button>
+              {['assigned', 'in_progress'].includes(course.status) && (
+                <ChatToggleButton courseId={courseId} onClick={() => setChatOpen(true)} userType="client" />
+              )}
             </div>
           </div>
         )}
@@ -420,6 +424,14 @@ const ClientCourse = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Chat Panel */}
+      <ChatPanel
+        courseId={courseId}
+        isOpen={chatOpen}
+        onClose={() => setChatOpen(false)}
+        userType="client"
+      />
     </div>
   );
 };

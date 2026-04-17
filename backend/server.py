@@ -1436,6 +1436,94 @@ async def serve_upload(filename: str, user=Depends(get_current_user)):
     from starlette.responses import FileResponse
     return FileResponse(filepath)
 
+# ========== CHAT ==========
+
+class ChatMessage(BaseModel):
+    message: str = Field(min_length=1, max_length=500)
+
+@api_router.post("/chat/{course_id}/send")
+async def send_chat_message(course_id: str, msg: ChatMessage, user=Depends(get_current_user)):
+    user_type = user.get("type")
+    if user_type not in ["client", "chauffeur"]:
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+    
+    course = await db.client_commandes.find_one({"id": course_id}, {"_id": 0})
+    if not course:
+        raise HTTPException(status_code=404, detail="Course non trouvée")
+    if course["status"] not in ["assigned", "in_progress"]:
+        raise HTTPException(status_code=400, detail="Chat disponible uniquement pendant une course active")
+    
+    # Verify user is part of this course
+    if user_type == "client" and course["client_id"] != user["sub"]:
+        raise HTTPException(status_code=403, detail="Pas votre course")
+    if user_type == "chauffeur" and course.get("chauffeur_id") != user["sub"]:
+        raise HTTPException(status_code=403, detail="Pas votre course")
+    
+    chat_doc = {
+        "id": str(uuid.uuid4()),
+        "course_id": course_id,
+        "sender_id": user["sub"],
+        "sender_type": user_type,
+        "sender_name": "",
+        "message": msg.message,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "read": False
+    }
+    
+    # Get sender name
+    if user_type == "client":
+        cl = await db.clients.find_one({"id": user["sub"]}, {"_id": 0})
+        chat_doc["sender_name"] = f"{cl.get('prenom','')} {cl.get('nom','')}" if cl else "Client"
+    else:
+        ch = await db.chauffeurs.find_one(
+            {"$or": [{"id": user["sub"]}, {"code_chauffeur": user.get("code")}]},
+            {"_id": 0}
+        )
+        chat_doc["sender_name"] = f"{ch.get('prenom','')} {ch.get('nom','')}" if ch else "Chauffeur"
+    
+    await db.chat_messages.insert_one(chat_doc)
+    
+    return {
+        "id": chat_doc["id"],
+        "sender_type": user_type,
+        "sender_name": chat_doc["sender_name"],
+        "message": msg.message,
+        "created_at": chat_doc["created_at"]
+    }
+
+@api_router.get("/chat/{course_id}/messages")
+async def get_chat_messages(course_id: str, after: Optional[str] = None, user=Depends(get_current_user)):
+    user_type = user.get("type")
+    if user_type not in ["client", "chauffeur"]:
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+    
+    query = {"course_id": course_id}
+    if after:
+        query["created_at"] = {"$gt": after}
+    
+    messages = await db.chat_messages.find(query, {"_id": 0}).sort("created_at", 1).to_list(200)
+    
+    # Mark messages as read for the current user
+    other_type = "chauffeur" if user_type == "client" else "client"
+    await db.chat_messages.update_many(
+        {"course_id": course_id, "sender_type": other_type, "read": False},
+        {"$set": {"read": True}}
+    )
+    
+    return {"messages": messages}
+
+@api_router.get("/chat/{course_id}/unread")
+async def get_unread_count(course_id: str, user=Depends(get_current_user)):
+    user_type = user.get("type")
+    other_type = "chauffeur" if user_type == "client" else "client"
+    
+    count = await db.chat_messages.count_documents({
+        "course_id": course_id,
+        "sender_type": other_type,
+        "read": False
+    })
+    return {"unread": count}
+
 # ========== HEALTH & ROOT ==========
 
 @api_router.get("/")

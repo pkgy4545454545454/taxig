@@ -15,6 +15,7 @@ import { Calendar as CalendarComponent } from '../../components/ui/calendar';
 import { toast } from 'sonner';
 import { chauffeurApi, courseApi } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
+import ChatPanel, { ChatToggleButton } from '../../components/ChatPanel';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import 'leaflet/dist/leaflet.css';
@@ -158,6 +159,9 @@ const ChauffeurDashboard = () => {
   // Document upload state
   const [documents, setDocuments] = useState([]);
   const [uploading, setUploading] = useState(false);
+  
+  // Chat state
+  const [chatOpen, setChatOpen] = useState(false);
   
   // Request browser notification permission when going online
   useEffect(() => {
@@ -949,8 +953,13 @@ const ChauffeurDashboard = () => {
                     </p>
                     <p className="text-white font-bold">{currentCourse.commande_no}</p>
                   </div>
-                  {/* Chrono temps réel */}
+                  {/* Chrono + Chat */}
                   <div className="flex items-center gap-3">
+                    <ChatToggleButton
+                      courseId={currentCourse.id}
+                      onClick={() => setChatOpen(true)}
+                      userType="chauffeur"
+                    />
                     <div className="bg-[#FF6B00]/20 px-4 py-2 rounded-lg">
                       <p className="text-[#FF6B00] font-mono font-bold text-lg">{formatTime(elapsedTime)}</p>
                     </div>
@@ -1425,6 +1434,16 @@ const ChauffeurDashboard = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Chat Panel */}
+      {currentCourse && (
+        <ChatPanel
+          courseId={currentCourse.id}
+          isOpen={chatOpen}
+          onClose={() => setChatOpen(false)}
+          userType="chauffeur"
+        />
+      )}
     </div>
   );
 };
