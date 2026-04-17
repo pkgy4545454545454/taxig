@@ -46,6 +46,8 @@ export const courseApi = {
   book: (data) => api.post('/course/book', data),
   get: (courseId) => api.get(`/course/${courseId}`),
   cancel: (courseId) => api.post(`/course/${courseId}/cancel`),
+  rate: (courseId, data) => api.post(`/course/${courseId}/rate`, data),
+  getRating: (courseId) => api.get(`/course/${courseId}/rating`),
 };
 
 // Chauffeur API
@@ -63,6 +65,10 @@ export const chauffeurApi = {
   completeCourse: (courseId, waitMinutes = 0) => api.post(`/chauffeur/complete-course/${courseId}`, null, { params: { wait_minutes: waitMinutes } }),
   addIndisponibilite: (date) => api.post('/chauffeur/indisponibilite', null, { params: { date } }),
   removeIndisponibilite: (date) => api.delete(`/chauffeur/indisponibilite/${date}`),
+  getDocuments: () => api.get('/chauffeur/documents'),
+  uploadDocument: (formData) => api.post('/chauffeur/upload-document', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
 };
 
 // Admin API
@@ -77,6 +83,14 @@ export const adminApi = {
   getClients: () => api.get('/admin/clients'),
   getCourses: (params) => api.get('/admin/courses', { params }),
   getRevenus: (period) => api.get('/admin/revenus', { params: { period } }),
+  getChauffeurDocuments: (chauffeurId) => api.get(`/admin/chauffeur/${chauffeurId}/documents`),
+  verifyDocument: (documentId, status) => {
+    const formData = new FormData();
+    formData.append('status', status);
+    return api.post(`/admin/document/${documentId}/verify`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
 };
 
 // Public API

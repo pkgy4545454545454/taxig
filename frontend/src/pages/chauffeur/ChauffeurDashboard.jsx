@@ -5,14 +5,15 @@ import L from 'leaflet';
 import { 
   Menu, Power, MapPin, Clock, DollarSign, Calendar, 
   CheckCircle, XCircle, Navigation, LogOut,
-  AlertCircle, Timer, Route, Download, FileText
+  AlertCircle, Timer, Route, Download, FileText,
+  Star, Upload, Bell, Loader2, Eye
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../../components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { Calendar as CalendarComponent } from '../../components/ui/calendar';
 import { toast } from 'sonner';
-import { chauffeurApi } from '../../lib/api';
+import { chauffeurApi, courseApi } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -143,6 +144,49 @@ const ChauffeurDashboard = () => {
   const incomingRequestRef = useRef(null);
   const currentCourseRef = useRef(null);
   const calculateRouteRef = useRef(null);
+  
+  // Browser notification permission
+  const [notifPermission, setNotifPermission] = useState(Notification?.permission || 'default');
+  
+  // Rating state
+  const [showRatingDialog, setShowRatingDialog] = useState(false);
+  const [ratingCourseId, setRatingCourseId] = useState(null);
+  const [ratingStars, setRatingStars] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [ratingHover, setRatingHover] = useState(0);
+  
+  // Document upload state
+  const [documents, setDocuments] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  
+  // Request browser notification permission when going online
+  useEffect(() => {
+    if (isOnline && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then(perm => {
+        setNotifPermission(perm);
+        if (perm === 'granted') {
+          toast.success('Notifications activées');
+        }
+      });
+    }
+  }, [isOnline]);
+  
+  // Send browser notification for incoming course
+  const sendBrowserNotification = useCallback((course) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const notif = new Notification('TaxiG - Nouvelle course !', {
+        body: `${course.prix_estime?.toFixed(2)}€ - ${course.pickup_address}`,
+        icon: LOGO_URL,
+        tag: 'taxig-course-' + course.id,
+        requireInteraction: true,
+        vibrate: [200, 100, 200]
+      });
+      notif.onclick = () => {
+        window.focus();
+        notif.close();
+      };
+    }
+  }, []);
   
   // Keep refs in sync with state
   useEffect(() => { positionRef.current = position; }, [position]);
@@ -423,9 +467,12 @@ const ChauffeurDashboard = () => {
           if (response.data.type === 'request' && (!curIncoming || curIncoming.id !== response.data.course.id)) {
             setIncomingRequest(response.data.course);
             setShowIncomingDialog(true);
+            // Audio notification
             if (audioRef.current) {
               audioRef.current.play().catch(() => {});
             }
+            // Browser push notification
+            sendBrowserNotification(response.data.course);
           } else if (response.data.type === 'assigned') {
             const course = response.data.course;
             setCurrentCourse(course);
@@ -544,18 +591,77 @@ const ChauffeurDashboard = () => {
   const handleCompleteCourse = async (waitMinutes = 0) => {
     if (!currentCourse) return;
     
+    const courseId = currentCourse.id;
     try {
-      const response = await chauffeurApi.completeCourse(currentCourse.id, waitMinutes);
+      const response = await chauffeurApi.completeCourse(courseId, waitMinutes);
       toast.success(`Course terminée ! Prix final: ${response.data.prix_final?.toFixed(2)}€`);
+      
+      // Show rating dialog
+      setRatingCourseId(courseId);
+      setRatingStars(0);
+      setRatingComment('');
+      setShowRatingDialog(true);
+      
       setCurrentCourse(null);
       setRoutePolyline([]);
       setRouteInfo(null);
-      setCourseStartTime(null); // Reset le chrono
+      setCourseStartTime(null);
       setElapsedTime(0);
       setRemainingTime(null);
       fetchProfile();
     } catch (error) {
       toast.error('Erreur lors de la finalisation');
+    }
+  };
+
+  // Submit rating
+  const handleSubmitRating = async () => {
+    if (!ratingCourseId || ratingStars === 0) {
+      toast.error('Sélectionnez une note');
+      return;
+    }
+    try {
+      await courseApi.rate(ratingCourseId, { stars: ratingStars, comment: ratingComment || null });
+      toast.success('Merci pour votre note !');
+      setShowRatingDialog(false);
+      setRatingCourseId(null);
+    } catch (error) {
+      if (error.response?.data?.detail === 'Vous avez déjà noté cette course') {
+        toast.info('Déjà noté');
+      } else {
+        toast.error('Erreur lors de la notation');
+      }
+      setShowRatingDialog(false);
+    }
+  };
+
+  // Fetch documents
+  const fetchDocuments = async () => {
+    try {
+      const response = await chauffeurApi.getDocuments();
+      setDocuments(response.data);
+    } catch (error) {
+      toast.error('Erreur chargement documents');
+    }
+  };
+
+  // Upload document
+  const handleUploadDocument = async (e, docType) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('document_type', docType);
+      await chauffeurApi.uploadDocument(formData);
+      toast.success('Document envoyé !');
+      fetchDocuments();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erreur lors de l\'envoi');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -615,6 +721,7 @@ const ChauffeurDashboard = () => {
     setMenuOpen(false);
     if (newView === 'commandes') fetchCommandes();
     if (newView === 'revenus') fetchRevenus();
+    if (newView === 'documents') fetchDocuments();
   };
 
   const handleLogout = () => {
@@ -680,6 +787,15 @@ const ChauffeurDashboard = () => {
               >
                 <Calendar className="w-5 h-5 mr-3" />
                 Calendrier
+              </Button>
+              <Button 
+                variant="ghost" 
+                className={`w-full justify-start text-white hover:text-[#FF6B00] hover:bg-white/10 ${view === 'documents' ? 'text-[#FF6B00]' : ''}`}
+                onClick={() => handleViewChange('documents')}
+                data-testid="menu-documents-btn"
+              >
+                <Upload className="w-5 h-5 mr-3" />
+                Mes documents
               </Button>
               <div className="pt-4 border-t border-[#1A3358] mt-4">
                 <Button 
@@ -1131,6 +1247,67 @@ const ChauffeurDashboard = () => {
             </div>
           </div>
         )}
+
+        {/* Documents View */}
+        {view === 'documents' && (
+          <div className="p-6 overflow-y-auto h-full" data-testid="documents-view">
+            <h2 className="text-2xl font-bold text-white mb-2">Mes documents</h2>
+            <p className="text-slate-400 mb-6">Envoyez vos documents pour vérification</p>
+            
+            <div className="space-y-4">
+              {[
+                { key: 'permis_conduire', label: 'Permis de conduire' },
+                { key: 'permis_sejour', label: 'Permis de séjour' },
+                { key: 'piece_identite', label: "Pièce d'identité" }
+              ].map(docType => {
+                const existing = documents.find(d => d.document_type === docType.key);
+                return (
+                  <div key={docType.key} className="card-taxi p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="text-white font-bold">{docType.label}</p>
+                        {existing && (
+                          <p className="text-slate-400 text-xs mt-1">
+                            {existing.original_name} - {(existing.file_size / 1024).toFixed(0)} Ko
+                          </p>
+                        )}
+                      </div>
+                      {existing ? (
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          existing.status === 'approved' ? 'badge-success' :
+                          existing.status === 'rejected' ? 'badge-error' :
+                          'badge-warning'
+                        }`} data-testid={`doc-status-${docType.key}`}>
+                          {existing.status === 'approved' ? 'Validé' :
+                           existing.status === 'rejected' ? 'Refusé' : 'En attente'}
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 text-xs">Non envoyé</span>
+                      )}
+                    </div>
+                    <label className="block">
+                      <input
+                        type="file"
+                        accept=".jpg,.jpeg,.png,.pdf"
+                        onChange={(e) => handleUploadDocument(e, docType.key)}
+                        className="hidden"
+                        data-testid={`upload-${docType.key}`}
+                      />
+                      <div className="flex items-center gap-2 cursor-pointer btn-taxi px-4 py-3 text-center justify-center text-sm">
+                        {uploading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Upload className="w-4 h-4" />
+                        )}
+                        {existing ? 'Remplacer' : 'Envoyer'}
+                      </div>
+                    </label>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Incoming Course Dialog */}
@@ -1187,6 +1364,65 @@ const ChauffeurDashboard = () => {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Rating Dialog */}
+      <Dialog open={showRatingDialog} onOpenChange={setShowRatingDialog}>
+        <DialogContent className="bg-[#0F2240] border-[#1A3358] max-w-sm mx-4">
+          <DialogHeader>
+            <DialogTitle className="text-white text-center text-xl">Noter le client</DialogTitle>
+            <DialogDescription className="text-slate-400 text-center">
+              Comment s'est passée la course ?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="flex justify-center gap-2 mb-6" data-testid="rating-stars">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  onClick={() => setRatingStars(star)}
+                  onMouseEnter={() => setRatingHover(star)}
+                  onMouseLeave={() => setRatingHover(0)}
+                  className="transition-transform hover:scale-125"
+                  data-testid={`rate-star-${star}`}
+                >
+                  <Star
+                    className={`w-10 h-10 ${
+                      star <= (ratingHover || ratingStars)
+                        ? 'fill-[#FF6B00] text-[#FF6B00]'
+                        : 'text-slate-600'
+                    } transition-colors`}
+                  />
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={ratingComment}
+              onChange={(e) => setRatingComment(e.target.value)}
+              placeholder="Commentaire (optionnel)"
+              className="w-full h-20 bg-[#0A1628] border border-[#1A3358] rounded-lg p-3 text-white placeholder:text-slate-500 text-sm resize-none focus:border-[#FF6B00] focus:outline-none"
+              data-testid="rating-comment"
+            />
+            <div className="flex gap-3 mt-4">
+              <Button
+                variant="ghost"
+                className="flex-1 text-slate-400"
+                onClick={() => setShowRatingDialog(false)}
+              >
+                Passer
+              </Button>
+              <Button
+                className="flex-1 btn-taxi"
+                onClick={handleSubmitRating}
+                disabled={ratingStars === 0}
+                data-testid="submit-rating-btn"
+              >
+                <Star className="w-4 h-4 mr-2" />
+                Noter
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

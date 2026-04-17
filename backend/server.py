@@ -1261,11 +1261,186 @@ async def stripe_webhook(request: Request):
         logger.error(f"Webhook error: {e}")
         return {"status": "error"}
 
+# ========== RATINGS ==========
+
+class RatingRequest(BaseModel):
+    stars: int = Field(ge=1, le=5)
+    comment: Optional[str] = None
+
+@api_router.post("/course/{course_id}/rate")
+async def rate_course(course_id: str, rating: RatingRequest, user=Depends(get_current_user)):
+    course = await db.client_commandes.find_one({"id": course_id}, {"_id": 0})
+    if not course:
+        raise HTTPException(status_code=404, detail="Course non trouvée")
+    if course["status"] != "completed":
+        raise HTTPException(status_code=400, detail="La course doit être terminée pour noter")
+    
+    rater_type = user.get("type")
+    rater_id = user["sub"]
+    
+    if rater_type == "client":
+        if course["client_id"] != rater_id:
+            raise HTTPException(status_code=403, detail="Pas votre course")
+        rated_id = course.get("chauffeur_id")
+        rated_type = "chauffeur"
+    elif rater_type == "chauffeur":
+        rated_id = course.get("client_id")
+        rated_type = "client"
+    else:
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+    
+    if not rated_id:
+        raise HTTPException(status_code=400, detail="Aucun destinataire pour la note")
+    
+    existing = await db.ratings.find_one({
+        "course_id": course_id, "rater_id": rater_id
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="Vous avez déjà noté cette course")
+    
+    rating_doc = {
+        "id": str(uuid.uuid4()),
+        "course_id": course_id,
+        "rater_id": rater_id,
+        "rater_type": rater_type,
+        "rated_id": rated_id,
+        "rated_type": rated_type,
+        "stars": rating.stars,
+        "comment": rating.comment,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.ratings.insert_one(rating_doc)
+    
+    # Update average rating on the rated entity
+    all_ratings = await db.ratings.find({"rated_id": rated_id}, {"_id": 0}).to_list(10000)
+    avg = sum(r["stars"] for r in all_ratings) / len(all_ratings) if all_ratings else 0
+    count = len(all_ratings)
+    
+    collection = "chauffeurs" if rated_type == "chauffeur" else "clients"
+    await db[collection].update_one(
+        {"id": rated_id},
+        {"$set": {"rating_avg": round(avg, 1), "rating_count": count}}
+    )
+    
+    return {"status": "rated", "average": round(avg, 1), "count": count}
+
+@api_router.get("/course/{course_id}/rating")
+async def get_course_rating(course_id: str, user=Depends(get_current_user)):
+    rater_id = user["sub"]
+    rating = await db.ratings.find_one({"course_id": course_id, "rater_id": rater_id}, {"_id": 0})
+    return {"rating": rating}
+
+@api_router.get("/chauffeur/{chauffeur_id}/rating")
+async def get_chauffeur_rating(chauffeur_id: str):
+    ratings = await db.ratings.find({"rated_id": chauffeur_id, "rated_type": "chauffeur"}, {"_id": 0}).to_list(100)
+    if not ratings:
+        return {"average": 0, "count": 0, "ratings": []}
+    avg = sum(r["stars"] for r in ratings) / len(ratings)
+    return {"average": round(avg, 1), "count": len(ratings), "ratings": ratings}
+
+# ========== DOCUMENT UPLOAD ==========
+
+UPLOAD_DIR = Path(__file__).parent / "uploads"
+UPLOAD_DIR.mkdir(exist_ok=True)
+
+@api_router.post("/chauffeur/upload-document")
+async def upload_document(
+    document_type: str = Form(...),
+    file: UploadFile = File(...),
+    user=Depends(get_current_user)
+):
+    if user.get("type") != "chauffeur":
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+    
+    if document_type not in ["permis_conduire", "permis_sejour", "piece_identite"]:
+        raise HTTPException(status_code=400, detail="Type de document invalide")
+    
+    allowed_ext = [".jpg", ".jpeg", ".png", ".pdf"]
+    ext = Path(file.filename).suffix.lower()
+    if ext not in allowed_ext:
+        raise HTTPException(status_code=400, detail="Format non supporté. Utilisez JPG, PNG ou PDF")
+    
+    if file.size and file.size > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Fichier trop volumineux (max 5 Mo)")
+    
+    file_id = str(uuid.uuid4())
+    filename = f"{user['sub']}_{document_type}_{file_id}{ext}"
+    filepath = UPLOAD_DIR / filename
+    
+    content = await file.read()
+    with open(filepath, "wb") as f:
+        f.write(content)
+    
+    doc = {
+        "id": file_id,
+        "chauffeur_id": user["sub"],
+        "document_type": document_type,
+        "filename": filename,
+        "original_name": file.filename,
+        "file_size": len(content),
+        "status": "pending",
+        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+        "verified_at": None,
+        "verified_by": None
+    }
+    await db.chauffeur_documents.insert_one(doc)
+    
+    return {"status": "uploaded", "document_id": file_id, "document_type": document_type}
+
+@api_router.get("/chauffeur/documents")
+async def get_chauffeur_documents(user=Depends(get_current_user)):
+    if user.get("type") != "chauffeur":
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+    
+    docs = await db.chauffeur_documents.find(
+        {"chauffeur_id": user["sub"]}, {"_id": 0}
+    ).sort("uploaded_at", -1).to_list(50)
+    return docs
+
+@api_router.get("/admin/chauffeur/{chauffeur_id}/documents")
+async def admin_get_documents(chauffeur_id: str, user=Depends(get_current_user)):
+    if user.get("type") != "admin":
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+    
+    docs = await db.chauffeur_documents.find(
+        {"chauffeur_id": chauffeur_id}, {"_id": 0}
+    ).sort("uploaded_at", -1).to_list(50)
+    return docs
+
+@api_router.post("/admin/document/{document_id}/verify")
+async def admin_verify_document(document_id: str, status: str = Form(...), user=Depends(get_current_user)):
+    if user.get("type") != "admin":
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+    if status not in ["approved", "rejected"]:
+        raise HTTPException(status_code=400, detail="Statut invalide")
+    
+    result = await db.chauffeur_documents.update_one(
+        {"id": document_id},
+        {"$set": {
+            "status": status,
+            "verified_at": datetime.now(timezone.utc).isoformat(),
+            "verified_by": user["sub"]
+        }}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Document non trouvé")
+    
+    return {"status": status, "document_id": document_id}
+
+@api_router.get("/uploads/{filename}")
+async def serve_upload(filename: str, user=Depends(get_current_user)):
+    filepath = UPLOAD_DIR / filename
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="Fichier non trouvé")
+    
+    from starlette.responses import FileResponse
+    return FileResponse(filepath)
+
 # ========== HEALTH & ROOT ==========
 
 @api_router.get("/")
 async def root():
-    return {"message": "TaxiG API", "version": "1.0.0"}
+    return {"message": "TaxiG API", "version": "2.0.0"}
 
 @api_router.get("/health")
 async def health():

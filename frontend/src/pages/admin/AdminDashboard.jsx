@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Menu, LogOut, Users, Car, DollarSign, BarChart3, 
   Clock, Plus, Trash2, FileText, Filter, ChevronRight,
-  AlertCircle, CheckCircle, XCircle, Search, TrendingUp
+  AlertCircle, CheckCircle, XCircle, Search, TrendingUp,
+  Eye, Star
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -52,6 +53,11 @@ const AdminDashboard = () => {
   const [showRapportDialog, setShowRapportDialog] = useState(false);
   const [selectedChauffeur, setSelectedChauffeur] = useState(null);
   const [rapportText, setRapportText] = useState('');
+  
+  // Document verification
+  const [showDocumentsDialog, setShowDocumentsDialog] = useState(false);
+  const [selectedChauffeurDocs, setSelectedChauffeurDocs] = useState([]);
+  const [docsLoading, setDocsLoading] = useState(false);
 
   // Fetch dashboard data
   const fetchDashboard = async () => {
@@ -171,6 +177,35 @@ const AdminDashboard = () => {
       setSelectedChauffeur(null);
     } catch (error) {
       toast.error('Erreur lors de l\'ajout');
+    }
+  };
+
+  // View chauffeur documents
+  const handleViewDocuments = async (chauffeur) => {
+    setSelectedChauffeur(chauffeur);
+    setDocsLoading(true);
+    setShowDocumentsDialog(true);
+    try {
+      const response = await adminApi.getChauffeurDocuments(chauffeur.id);
+      setSelectedChauffeurDocs(response.data);
+    } catch (error) {
+      toast.error('Erreur chargement documents');
+      setSelectedChauffeurDocs([]);
+    } finally {
+      setDocsLoading(false);
+    }
+  };
+
+  // Verify document
+  const handleVerifyDocument = async (documentId, status) => {
+    try {
+      await adminApi.verifyDocument(documentId, status);
+      toast.success(status === 'approved' ? 'Document validé' : 'Document refusé');
+      if (selectedChauffeur) {
+        handleViewDocuments(selectedChauffeur);
+      }
+    } catch (error) {
+      toast.error('Erreur');
     }
   };
 
@@ -405,6 +440,7 @@ const AdminDashboard = () => {
                       <TableHead className="text-slate-400">Code</TableHead>
                       <TableHead className="text-slate-400">Statut</TableHead>
                       <TableHead className="text-slate-400">Courses</TableHead>
+                      <TableHead className="text-slate-400">Note</TableHead>
                       <TableHead className="text-slate-400">Revenus 30j</TableHead>
                       <TableHead className="text-slate-400">Actions</TableHead>
                     </TableRow>
@@ -432,11 +468,30 @@ const AdminDashboard = () => {
                           </span>
                         </TableCell>
                         <TableCell className="text-white">{chauffeur.nombre_courses}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Star className={`w-4 h-4 ${chauffeur.rating_avg ? 'fill-[#FF6B00] text-[#FF6B00]' : 'text-slate-600'}`} />
+                            <span className="text-white text-sm">{chauffeur.rating_avg?.toFixed(1) || '-'}</span>
+                            {chauffeur.rating_count > 0 && (
+                              <span className="text-slate-500 text-xs">({chauffeur.rating_count})</span>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-orange-400 font-bold">
                           {chauffeur.revenus?.revenus_brut_30j?.toFixed(2) || '0.00'}€
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 rounded-xl"
+                              onClick={() => handleViewDocuments(chauffeur)}
+                              data-testid={`docs-btn-${chauffeur.id}`}
+                              title="Documents"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -797,6 +852,70 @@ const AdminDashboard = () => {
               Envoyer
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Documents Dialog */}
+      <Dialog open={showDocumentsDialog} onOpenChange={setShowDocumentsDialog}>
+        <DialogContent className="bg-navy-800/95 backdrop-blur-xl border-navy-700 rounded-2xl max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-white">Documents de {selectedChauffeur?.prenom} {selectedChauffeur?.nom}</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Vérifier et valider les documents du chauffeur
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4 max-h-96 overflow-y-auto">
+            {docsLoading ? (
+              <p className="text-slate-400 text-center py-8">Chargement...</p>
+            ) : selectedChauffeurDocs.length === 0 ? (
+              <p className="text-slate-400 text-center py-8">Aucun document envoyé</p>
+            ) : (
+              selectedChauffeurDocs.map(doc => (
+                <div key={doc.id} className="card-taxi p-4" data-testid={`admin-doc-${doc.id}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <p className="text-white font-bold text-sm">
+                        {doc.document_type === 'permis_conduire' ? 'Permis de conduire' :
+                         doc.document_type === 'permis_sejour' ? 'Permis de séjour' : "Pièce d'identité"}
+                      </p>
+                      <p className="text-slate-500 text-xs">{doc.original_name} - {(doc.file_size / 1024).toFixed(0)} Ko</p>
+                      <p className="text-slate-500 text-xs">{new Date(doc.uploaded_at).toLocaleDateString('fr-FR')}</p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      doc.status === 'approved' ? 'badge-success' :
+                      doc.status === 'rejected' ? 'badge-error' :
+                      'badge-warning'
+                    }`}>
+                      {doc.status === 'approved' ? 'Validé' :
+                       doc.status === 'rejected' ? 'Refusé' : 'En attente'}
+                    </span>
+                  </div>
+                  {doc.status === 'pending' && (
+                    <div className="flex gap-2 mt-3">
+                      <Button
+                        size="sm"
+                        className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white text-xs"
+                        onClick={() => handleVerifyDocument(doc.id, 'approved')}
+                        data-testid={`approve-doc-${doc.id}`}
+                      >
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Valider
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs"
+                        onClick={() => handleVerifyDocument(doc.id, 'rejected')}
+                        data-testid={`reject-doc-${doc.id}`}
+                      >
+                        <XCircle className="w-3 h-3 mr-1" />
+                        Refuser
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
