@@ -4,8 +4,8 @@
 Build a complete taxi application called "TaxiG" with three-sided platform for clients, drivers, and administrator.
 
 ## Core Requirements
-- **Client App:** Registration/login, map view, pickup/destination inputs, price estimation, booking, ride tracking, history, rating
-- **Driver App:** Login with code, online/offline status, real-time requests with browser notifications, accept/reject, route map, revenue export PDF, document upload, rating
+- **Client App:** Registration/login, map view, pickup/destination inputs, price estimation, booking, ride tracking, history, rating, real-time chat with driver
+- **Driver App:** Login with code, online/offline status, real-time requests with browser notifications, accept/reject, route map, revenue export PDF, document upload, rating, real-time chat with client
 - **Admin Dashboard:** Platform statistics, driver/client management, ride monitoring, document verification
 - **Design:** "Bleu marine + Orange (EasyJet)" visual theme
 
@@ -13,7 +13,6 @@ Build a complete taxi application called "TaxiG" with three-sided platform for c
 - Frontend: React + Tailwind CSS + Shadcn/UI + Leaflet (OpenStreetMap)
 - Backend: FastAPI + MongoDB (Motor) + JWT Auth
 - Maps: OpenStreetMap (Nominatim geocoding, OSRM routing) - NO Google Maps
-- Payments: Stripe (currently broken/expired key)
 
 ## What's Been Implemented
 
@@ -30,7 +29,6 @@ Build a complete taxi application called "TaxiG" with three-sided platform for c
 ### Phase 2 - UI Redesign (Complete)
 - "Bleu Marine + Orange" theme applied to ALL pages
 - Removed Google Maps, PostHog, debug logs
-- Fixed dual-database bug (taxi vs taxig)
 
 ### Phase 3 - Real-time & New Features (Complete - Apr 2026)
 - Fixed driver notification polling (stable 3s interval using useRef)
@@ -38,14 +36,20 @@ Build a complete taxi application called "TaxiG" with three-sided platform for c
 - 5-star rating system (client rates driver, driver rates client)
 - Document upload for drivers (permis de conduire, permis de séjour, pièce d'identité)
 - Admin document verification (approve/reject)
-- Comprehensive testing: 4 booking tests with multiple drivers
+
+### Phase 4 - Real-time Chat (Complete - Apr 2026)
+- Bidirectional chat between client and driver during active rides
+- 2-second polling for real-time message updates
+- Unread message badge counter with 3s polling
+- Sound notification for new messages
+- Fullscreen chat panel with Navy+Orange theme
+- Reusable ChatPanel component (used in both ClientCourse and ChauffeurDashboard)
+- Backend: chat_messages collection with read/unread tracking
 
 ## Credentials
 - Client: jean.dupont@test.com / test123
 - Driver: TAXI001 / chauffeur123 (Jean Martin)
-- Driver: TEST002 / test123
-- Driver: TEST003 / test123
-- Driver: TEST004 / test123
+- Driver: TEST002-004 / test123
 - Admin: naim / admin123
 
 ## Prioritized Backlog
@@ -55,3 +59,4 @@ Build a complete taxi application called "TaxiG" with three-sided platform for c
 ### P2 - Future Tasks
 - File refactoring (large dashboard components >1000 lines)
 - Service Worker for offline push notifications
+- WebSocket upgrade for chat (replace polling)
